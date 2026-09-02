@@ -1,0 +1,35 @@
+{
+  "model_name": "experimental_storm_conditioned_spatial_susceptibility_xgboost",
+  "model_type": "experimental_storm_conditioned_spatial_susceptibility",
+  "model_version": "1.0.0",
+  "framework": "xgboost",
+  "framework_version": "3.4.1",
+  "features": [
+    "elevation_m",
+    "slope_deg",
+    "rain_prev_24h_mm",
+    "rain_prev_72h_mm",
+    "rain_prev_7d_mm"
+  ],
+  "target": "label",
+  "output_semantics": {
+    "output_key": "ml_susceptibility_score",
+    "score_range": [
+      0.0,
+      1.0
+    ],
+    "interpretation": "Spatial susceptibility relative to Cyclone Remal peak storm regime. NOT a forward-looking temporal event probability."
+  },
+  "selected_threshold": 0.48,
+  "training_date": "2026-09-02",
+  "training_dataset": "data/generated/model_features.csv",
+  "training_samples_total": 351,
+  "random_seed": 42,
+  "limitations": [
+    "Single event date limitation: All positive landslide labels originate from Cyclone Remal (2024-05-28), meaning the model learns spatial susceptibility conditional on an extreme storm event rather than dynamic temporal triggering thresholds.",
+    "Spatial domain shift: The model demonstrates higher accuracy in core Aizawl corridors with transfer degradation in outer topographic sectors.",
+    "Feature collinearity: Antecedent rainfall windows (24h, 72h, 7d) exhibit high mutual correlation (r > 0.77 to 0.89), causing tree splits to substitute rainfall proxies.",
+    "Elevation dominance: Topography (elevation_m, slope_deg) drives significant split gain due to clustered settlements on ridge slopes in Aizawl.",
+    "Operational role: This model must strictly serve as a secondary modulating signal within the TerraWatch Hybrid Risk Engine, subordinate to deterministic physics (SHALSTAB) and empirical rainfall thresholds."
+  ]
+}

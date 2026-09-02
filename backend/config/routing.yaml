@@ -1,0 +1,27 @@
+# Prototype operational routing parameters for the hilly Aizawl pilot.
+# Speed defaults are conservative engineering assumptions used only when OSM maxspeed is absent.
+default_speed_kph:
+  motorway: 50
+  trunk: 45
+  primary: 40
+  secondary: 35
+  tertiary: 30
+  residential: 20
+  unclassified: 20
+  service: 15
+
+safer_route:
+  risk_time_multiplier: 4.0
+  verified_hazard_penalty_seconds: 10000
+  unverified_report_penalty_seconds: 30
+  unverified_report_penalty_cap_seconds: 300
+  high_risk_threshold: 50
+
+network:
+  major_road_classes:
+    - motorway
+    - trunk
+    - primary
+    - secondary
+  snap_max_distance_m: 5000
+

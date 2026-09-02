@@ -1,0 +1,59 @@
+{
+  "source": "OpenStreetMap contributors via Geofabrik",
+  "license": "ODbL 1.0",
+  "processed_at": "2026-09-02T15:06:22.431449+00:00",
+  "downloaded_at": "2026-09-02T15:00:53.085482+00:00",
+  "dataset_version": "2026-09-01T20:20:50Z",
+  "source_url": "https://download.geofabrik.de/asia/india/north-eastern-zone-latest.osm.pbf",
+  "bbox": [
+    92.6,
+    23.6,
+    92.85,
+    23.85
+  ],
+  "crs": "EPSG:4326",
+  "road_segments": 116763,
+  "total_road_length_m": 1196811.18,
+  "graph_nodes": 115929,
+  "graph_edges_directed": 232947,
+  "weakly_connected_components": 25,
+  "largest_weak_component_nodes": 109503,
+  "settlements": 14,
+  "hospitals": 19,
+  "clinics": 4,
+  "police_stations": 6,
+  "fire_stations": 0,
+  "ambulance_or_other_emergency": 0,
+  "facilities_total": 29,
+  "osm_tags_used": {
+    "highway": 263041,
+    "name": 4176,
+    "surface": 10156,
+    "maxspeed": 787,
+    "bridge": 12577,
+    "tunnel": 365,
+    "oneway": 3907,
+    "access": 207
+  },
+  "invalid_geometries": 3,
+  "missing_names": {
+    "road_segments": 113007,
+    "settlements": 4,
+    "facilities": 0
+  },
+  "speed_defaults_kph": {
+    "motorway": 50,
+    "trunk": 45,
+    "primary": 40,
+    "secondary": 35,
+    "tertiary": 30,
+    "residential": 20,
+    "unclassified": 20,
+    "service": 15
+  },
+  "notes": [
+    "Roads are physical OSM way-node segments; graph edges are directed and may contain both directions.",
+    "Missing names remain null; no road, settlement, facility, or population value is invented.",
+    "Node and way POIs are processed; relation-only POIs may require a future area/relation pass."
+  ]
+}

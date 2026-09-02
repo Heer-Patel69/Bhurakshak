@@ -1,0 +1,200 @@
+{
+  "model_name": "experimental_storm_conditioned_spatial_susceptibility_xgboost",
+  "model_type": "experimental_storm_conditioned_spatial_susceptibility",
+  "model_version": "1.0.0",
+  "selected_threshold": 0.48,
+  "best_hyperparameters": {
+    "max_depth": 3,
+    "learning_rate": 0.03,
+    "n_estimators": 60,
+    "min_child_weight": 3,
+    "subsample": 0.7,
+    "colsample_bytree": 0.7,
+    "reg_alpha": 0.5,
+    "reg_lambda": 2.0,
+    "scale_pos_weight": 1.0
+  },
+  "spatial_splits": {
+    "train": {
+      "spatial_group": "Central_West_Aizawl_Block",
+      "total": 239,
+      "pct": 68.09,
+      "positives": 94,
+      "pos_pct": 39.33,
+      "backgrounds": 145,
+      "bg_pct": 60.67,
+      "lat_bounds": [
+        23.551835,
+        24.096753
+      ],
+      "lon_bounds": [
+        92.459215,
+        92.999012
+      ]
+    },
+    "val": {
+      "spatial_group": "South_Aizawl_Block",
+      "total": 53,
+      "pct": 15.1,
+      "positives": 13,
+      "pos_pct": 24.53,
+      "backgrounds": 40,
+      "bg_pct": 75.47,
+      "lat_bounds": [
+        23.432718,
+        23.54887
+      ],
+      "lon_bounds": [
+        92.455711,
+        92.986885
+      ]
+    },
+    "test": {
+      "spatial_group": "NorthEast_Aizawl_Block",
+      "total": 59,
+      "pct": 16.81,
+      "positives": 10,
+      "pos_pct": 16.95,
+      "backgrounds": 49,
+      "bg_pct": 83.05,
+      "lat_bounds": [
+        23.732666,
+        24.089207
+      ],
+      "lon_bounds": [
+        92.797161,
+        92.998473
+      ]
+    }
+  },
+  "splits_metrics": {
+    "train": {
+      "sample_count": 239,
+      "positive_count": 94,
+      "background_count": 145,
+      "accuracy": 0.9665,
+      "precision": 0.9778,
+      "recall": 0.9362,
+      "f1_score": 0.9565,
+      "roc_auc": 0.9927,
+      "pr_auc": 0.9901,
+      "brier_score": 0.066,
+      "confusion_matrix": {
+        "tn": 143,
+        "fp": 2,
+        "fn": 6,
+        "tp": 88
+      }
+    },
+    "validation": {
+      "sample_count": 53,
+      "positive_count": 13,
+      "background_count": 40,
+      "accuracy": 0.8868,
+      "precision": 0.6842,
+      "recall": 1.0,
+      "f1_score": 0.8125,
+      "roc_auc": 0.9192,
+      "pr_auc": 0.7207,
+      "brier_score": 0.1327,
+      "confusion_matrix": {
+        "tn": 34,
+        "fp": 6,
+        "fn": 0,
+        "tp": 13
+      }
+    },
+    "test": {
+      "sample_count": 59,
+      "positive_count": 10,
+      "background_count": 49,
+      "accuracy": 0.8136,
+      "precision": 0.4286,
+      "recall": 0.3,
+      "f1_score": 0.3529,
+      "roc_auc": 0.8276,
+      "pr_auc": 0.5295,
+      "brier_score": 0.123,
+      "confusion_matrix": {
+        "tn": 45,
+        "fp": 4,
+        "fn": 7,
+        "tp": 3
+      }
+    }
+  },
+  "feature_importance": [
+    {
+      "feature": "elevation_m",
+      "gain_score": 28.169897079467773,
+      "gain_importance_pct": 58.07,
+      "shap_mean_abs": 0.7591999769210815,
+      "shap_importance_pct": 46.15
+    },
+    {
+      "feature": "slope_deg",
+      "gain_score": 0.999969482421875,
+      "gain_importance_pct": 2.06,
+      "shap_mean_abs": 0.006599999964237213,
+      "shap_importance_pct": 0.4
+    },
+    {
+      "feature": "rain_prev_24h_mm",
+      "gain_score": 3.912985324859619,
+      "gain_importance_pct": 8.07,
+      "shap_mean_abs": 0.22030000388622284,
+      "shap_importance_pct": 13.39
+    },
+    {
+      "feature": "rain_prev_72h_mm",
+      "gain_score": 9.630245208740234,
+      "gain_importance_pct": 19.85,
+      "shap_mean_abs": 0.45320001244544983,
+      "shap_importance_pct": 27.55
+    },
+    {
+      "feature": "rain_prev_7d_mm",
+      "gain_score": 5.795561790466309,
+      "gain_importance_pct": 11.95,
+      "shap_mean_abs": 0.20569999516010284,
+      "shap_importance_pct": 12.5
+    }
+  ],
+  "feature_correlation_matrix": {
+    "elevation_m": {
+      "elevation_m": 1.0,
+      "slope_deg": 0.3323870748059968,
+      "rain_prev_24h_mm": -0.1959325997433869,
+      "rain_prev_72h_mm": -0.40201526836701457,
+      "rain_prev_7d_mm": -0.2847253646997433
+    },
+    "slope_deg": {
+      "elevation_m": 0.3323870748059968,
+      "slope_deg": 1.0,
+      "rain_prev_24h_mm": -0.1296789477430242,
+      "rain_prev_72h_mm": -0.1990988084726812,
+      "rain_prev_7d_mm": -0.16557373669074676
+    },
+    "rain_prev_24h_mm": {
+      "elevation_m": -0.1959325997433869,
+      "slope_deg": -0.1296789477430242,
+      "rain_prev_24h_mm": 1.0,
+      "rain_prev_72h_mm": 0.778309756480616,
+      "rain_prev_7d_mm": 0.7163201688995054
+    },
+    "rain_prev_72h_mm": {
+      "elevation_m": -0.40201526836701457,
+      "slope_deg": -0.1990988084726812,
+      "rain_prev_24h_mm": 0.778309756480616,
+      "rain_prev_72h_mm": 1.0,
+      "rain_prev_7d_mm": 0.8968706115798024
+    },
+    "rain_prev_7d_mm": {
+      "elevation_m": -0.2847253646997433,
+      "slope_deg": -0.16557373669074676,
+      "rain_prev_24h_mm": 0.7163201688995054,
+      "rain_prev_72h_mm": 0.8968706115798024,
+      "rain_prev_7d_mm": 1.0
+    }
+  }
+}

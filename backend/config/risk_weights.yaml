@@ -1,0 +1,41 @@
+# Prototype/configurable operational risk heuristics; these are not scientifically calibrated constants.
+weights:
+  rainfall: 0.35
+  terrain: 0.20
+  historical: 0.20
+  ml: 0.10
+  sensor: 0.05
+  satellite: 0.05
+  verified_reports: 0.05
+
+thresholds:
+  low: 0
+  medium: 25
+  high: 50
+  critical: 75
+
+rainfall_reference_mm:
+  rainfall_24h_mm: 100
+  rainfall_72h_mm: 200
+  rainfall_7d_mm: 300
+
+terrain_reference:
+  slope_full_score_deg: 45
+  elevation_full_score_m: 1800
+
+confidence:
+  signal_weights:
+    rainfall: 25
+    terrain: 20
+    historical: 20
+    ml: 15
+    sensor: 7.5
+    satellite: 7.5
+    verified_reports: 5
+  high_threshold: 75
+  moderate_threshold: 45
+  weather_fresh_seconds: 10800
+  weather_stale_seconds: 86400
+  sensor_fresh_seconds: 21600
+  satellite_fresh_seconds: 259200
+

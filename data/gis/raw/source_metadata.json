@@ -1,0 +1,13 @@
+{
+  "source": "OpenStreetMap contributors via Geofabrik",
+  "license": "ODbL 1.0",
+  "source_url": "https://download.geofabrik.de/asia/india/north-eastern-zone-latest.osm.pbf",
+  "downloaded_at": "2026-09-02T15:00:53.085482+00:00",
+  "last_modified": "Wed, 02 Sep 2026 05:36:05 GMT",
+  "etag": "\"6829bdd-65a79695910b6\"",
+  "content_length_bytes": 109222877,
+  "sha256": "33c5be70d7ed4f431ed20a437670dc1be1d5c7b807cef45728f7f888019dd981",
+  "md5": "833f4f6e6689cb503afea7d74a369ed2",
+  "published_md5": "833f4f6e6689cb503afea7d74a369ed2",
+  "md5_verified": true
+}

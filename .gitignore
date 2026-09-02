@@ -1,0 +1,24 @@
+# Python & Environment
+__pycache__/
+*.py[cod]
+*$py.class
+*.env
+.env
+.venv/
+venv/
+ENV/
+
+# Temporary / Scratch
+.codex-tmp/
+*.tmp
+*.log
+
+# OS generated
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Large Raw / Binary Data (>100MB exceeds GitHub hard limit)
+data/gis/raw/*.osm.pbf
+data/gis/raw/*.pbf
+data/gis/processed/*.graphml

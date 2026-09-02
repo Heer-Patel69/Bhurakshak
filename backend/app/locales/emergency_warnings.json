@@ -1,0 +1,18 @@
+{
+  "_metadata": {
+    "deterministic": true,
+    "review_status": "requires_authority_language_review_before_operational_delivery"
+  },
+  "en": {
+    "avoid_area": "Avoid the affected area and follow official instructions.",
+    "road_closed": "This road is officially reported closed. Use an approved alternative route."
+  },
+  "hi": {
+    "avoid_area": "प्रभावित क्षेत्र से दूर रहें और आधिकारिक निर्देशों का पालन करें।",
+    "road_closed": "यह सड़क आधिकारिक रूप से बंद बताई गई है। स्वीकृत वैकल्पिक मार्ग का उपयोग करें।"
+  },
+  "lus": {
+    "avoid_area": "Hmun hlauhawm chu tlansan la, sorkar thuneitute thupek zawm rawh.",
+    "road_closed": "He kawng hi sorkar thu angin khar a ni. Kawng dang pawm tawh hmang rawh."
+  }
+}
