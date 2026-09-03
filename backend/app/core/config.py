@@ -21,7 +21,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    app_name: str = "TerraWatch API"
+    app_name: str = "Bhu Rakshak API"
     app_env: str = "development"
     api_v1_prefix: str = "/api/v1"
     log_level: str = "INFO"
@@ -32,6 +32,8 @@ class Settings(BaseSettings):
     supabase_service_role_key: str | None = None
 
     groq_api_key: str | None = None
+    groq_model: str = "openai/gpt-oss-20b"
+    groq_api_base_url: str = "https://api.groq.com/openai/v1"
 
     imd_api_base_url: str | None = None
     imd_api_key: str | None = None
@@ -57,6 +59,9 @@ class Settings(BaseSettings):
 
     sensor_ingest_secret: str | None = None
     authority_api_key: str | None = None
+    frontend_origins: str = "http://localhost:3000"
+    supabase_storage_bucket: str = "hazard-reports"
+    media_signed_url_seconds: int = Field(default=900, ge=60, le=86_400)
 
     historical_inventory_path: Path = REPOSITORY_ROOT / "data" / "Cleaned" / "landslide_date_audit.csv"
     terrain_features_path: Path = REPOSITORY_ROOT / "data" / "Cleaned" / "aizawl_terrain_features.csv"
@@ -69,7 +74,7 @@ class Settings(BaseSettings):
     roads_geojson_path: Path | None = REPOSITORY_ROOT / "data" / "gis" / "processed" / "aizawl_roads.geojson"
     villages_geojson_path: Path | None = REPOSITORY_ROOT / "data" / "gis" / "processed" / "aizawl_settlements.geojson"
     facilities_geojson_path: Path | None = REPOSITORY_ROOT / "data" / "gis" / "processed" / "aizawl_facilities.geojson"
-    road_graph_path: Path | None = REPOSITORY_ROOT / "data" / "gis" / "processed" / "aizawl_road_graph.graphml"
+    road_graph_path: Path | None = REPOSITORY_ROOT / "data" / "gis" / "processed" / "aizawl_road_graph.joblib"
     routing_config_path: Path = BACKEND_ROOT / "config" / "routing.yaml"
     aizawl_gis_bbox: str = "92.60,23.60,92.85,23.85"
 
@@ -77,6 +82,9 @@ class Settings(BaseSettings):
     historical_normalization_percentile: float = Field(default=95.0, ge=50, le=100)
     risk_grid_max_cells: int = Field(default=400, ge=4, le=10_000)
     risk_grid_cache_seconds: int = Field(default=900, ge=0)
+    gis_default_limit: int = Field(default=5_000, ge=1, le=100_000)
+    gis_max_limit: int = Field(default=20_000, ge=100, le=250_000)
+    routing_risk_grid_resolution: int = Field(default=5, ge=2, le=20)
     max_upload_bytes: int = Field(default=20_000_000, ge=1_000)
     allowed_media_mime_types: str = "image/jpeg,image/png,image/webp,video/mp4,audio/mpeg,audio/wav,audio/webm"
 
@@ -86,6 +94,10 @@ class Settings(BaseSettings):
     @property
     def media_mime_types(self) -> set[str]:
         return {item.strip().lower() for item in self.allowed_media_mime_types.split(",") if item.strip()}
+
+    @property
+    def frontend_origin_list(self) -> list[str]:
+        return [item.strip() for item in self.frontend_origins.split(",") if item.strip() and item.strip() != "*"]
 
 
 @lru_cache(maxsize=1)

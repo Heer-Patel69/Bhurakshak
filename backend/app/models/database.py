@@ -23,26 +23,58 @@ class CitizenReportDB(Base):
     report_id: Mapped[str] = mapped_column(String(36), primary_key=True)
     client_generated_id: Mapped[str | None] = mapped_column(String(36), unique=True, index=True)
     user_id: Mapped[str | None] = mapped_column(String(128), index=True)
+    reporter_type: Mapped[str] = mapped_column(String(32), default="citizen", index=True)
     latitude: Mapped[float] = mapped_column(Float, index=True)
     longitude: Mapped[float] = mapped_column(Float, index=True)
     accuracy_m: Mapped[float | None] = mapped_column(Float)
     observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
     category: Mapped[str] = mapped_column(String(64), index=True)
     description_original: Mapped[str | None] = mapped_column(Text)
+    place_name: Mapped[str | None] = mapped_column(String(240))
+    landmark: Mapped[str | None] = mapped_column(String(500))
+    road_name: Mapped[str | None] = mapped_column(String(240))
+    district: Mapped[str | None] = mapped_column(String(128))
+    severity_observed: Mapped[str | None] = mapped_column(String(32))
     transcript: Mapped[str | None] = mapped_column(Text)
     ai_summary: Mapped[str | None] = mapped_column(Text)
     ai_severity: Mapped[str | None] = mapped_column(String(32))
     ai_confidence: Mapped[float | None] = mapped_column(Float)
+    ai_suggested_category: Mapped[str | None] = mapped_column(String(64))
+    ai_model: Mapped[str | None] = mapped_column(String(128))
+    ai_generated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     media_url: Mapped[str | None] = mapped_column(Text)
     media_mime_type: Mapped[str | None] = mapped_column(String(100))
     language: Mapped[str] = mapped_column(String(8), default="en")
+    translated_text: Mapped[str | None] = mapped_column(Text)
+    translated_language: Mapped[str | None] = mapped_column(String(8))
     location_source: Mapped[str] = mapped_column(String(32))
     verification_status: Mapped[str] = mapped_column(String(32), index=True, default="pending")
     verified_by: Mapped[str | None] = mapped_column(String(128))
     verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    verification_note: Mapped[str | None] = mapped_column(Text)
+    affected_road_id: Mapped[str | None] = mapped_column(String(128), index=True)
+    authority_action_id: Mapped[str | None] = mapped_column(String(36))
+    created_offline: Mapped[bool] = mapped_column(Boolean, default=False)
+    client_created_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    sync_status: Mapped[str] = mapped_column(String(32), default="synced")
     incident_id: Mapped[str | None] = mapped_column(String(36), ForeignKey("incidents.incident_id"), index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, index=True)
+
+
+class ReportMediaDB(Base):
+    __tablename__ = "report_media"
+
+    media_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    report_id: Mapped[str] = mapped_column(String(36), ForeignKey("citizen_reports.report_id"), index=True)
+    storage_path: Mapped[str] = mapped_column(Text, unique=True)
+    media_type: Mapped[str] = mapped_column(String(16))
+    mime_type: Mapped[str] = mapped_column(String(100))
+    file_size_bytes: Mapped[int] = mapped_column(Integer)
+    source: Mapped[str] = mapped_column(String(32))
+    original_filename: Mapped[str | None] = mapped_column(String(255))
+    sha256: Mapped[str] = mapped_column(String(64))
+    uploaded_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 
 
 class IncidentDB(Base):
@@ -213,4 +245,3 @@ class Database:
             raise
         finally:
             db.close()
-

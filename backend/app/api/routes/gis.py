@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Query, Request
 
 
 router = APIRouter(prefix="/gis", tags=["gis"])
@@ -15,3 +15,7 @@ def gis_layers(request: Request) -> dict:
         "analytical_source_policy": "Configured OSM geometry/extracts; never rendered map tiles.",
     }
 
+
+@router.get("/historical-landslides")
+def historical_landslides(request: Request, bbox: str | None = Query(default=None)) -> dict:
+    return request.app.state.services.historical.feature_collection(bbox)

@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from typing import Literal
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Depends, Query, Request
+from sqlalchemy.orm import Session
+
+from ...dependencies import get_db_session
+from ...models.database import RoadStatusDB
 
 
 router = APIRouter(prefix="/villages", tags=["villages"])
@@ -17,9 +21,10 @@ def villages(request: Request) -> dict:
 
 
 @router.get("/isolation")
-def village_isolation(
+async def village_isolation(
     request: Request,
     analysis_mode: Literal["confirmed_closure", "risk_scenario"] = Query(default="risk_scenario"),
+    session: Session = Depends(get_db_session),
 ) -> dict:
     services = request.app.state.services
     if services.routing.graph is None:
@@ -41,23 +46,25 @@ def village_isolation(
                     "nearest_node": properties["nearest_node"],
                 }
             )
-    destination_nodes = [
-        node for node, attrs in services.routing.graph.nodes(data=True) if attrs.get("critical_destination")
-    ]
-    affected_edges = [
-        (u, v)
-        for u, v, attrs in services.routing.graph.edges(data=True)
-        if (attrs.get("officially_closed") if analysis_mode == "confirmed_closure" else attrs.get("risk_score", 0) >= 75)
-    ]
+    facilities = services.geo.load_feature_collection(request.app.state.settings.facilities_geojson_path, layer="facilities")
+    hospital_nodes = [f["properties"]["nearest_node"] for f in facilities.get("features", []) if f.get("properties", {}).get("facility_type") in {"hospital", "clinic"} and f["properties"].get("nearest_node")]
+    major_nodes = [node for node, attrs in services.routing.graph.nodes(data=True) if attrs.get("major_road")]
+    if analysis_mode == "risk_scenario":
+        grid = await services.risk_grid.generate(session, bbox=request.app.state.settings.aizawl_gis_bbox, resolution=request.app.state.settings.routing_risk_grid_resolution)
+        services.routing.set_risk_grid(grid)
+        affected_edges = [(u, v) for u, v, attrs in services.routing.graph.edges(data=True) if services.routing._risk(u, v, attrs) >= 75]
+    else:
+        closed_ids = {row.road_id for row in session.query(RoadStatusDB).filter(RoadStatusDB.status == "officially_closed", RoadStatusDB.verified.is_(True)).all()}
+        affected_edges = [(u, v) for u, v, attrs in services.routing.graph.edges(data=True) if attrs.get("officially_closed") or str(attrs.get("edge_id")) in closed_ids]
     return {
         "status": "available",
         "analysis_mode": analysis_mode,
         "villages": services.isolation.analyze(
             services.routing.graph,
             villages_data,
-            destination_nodes,
+            hospital_nodes,
             affected_edges,
             analysis_mode=analysis_mode,
+            major_road_nodes=major_nodes,
         ),
     }
-

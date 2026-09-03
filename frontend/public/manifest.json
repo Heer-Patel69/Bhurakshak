@@ -1,0 +1,21 @@
+{
+  "name": "Bhu Rakshak",
+  "short_name": "BhuRakshak",
+  "description": "AI-Assisted Landslide Risk & Connectivity Intelligence for Aizawl, Mizoram",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#090d16",
+  "theme_color": "#0ea5e9",
+  "icons": [
+    {
+      "src": "/globe.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/globe.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

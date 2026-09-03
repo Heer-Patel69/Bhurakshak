@@ -3,6 +3,7 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from .api.router import api_router
 from .core.config import Settings, get_settings
@@ -29,7 +30,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         title=settings.app_name,
         version="1.0.0",
         description=(
-            "TerraWatch landslide susceptibility, infrastructure exposure, connectivity, and reporting API. "
+            "Bhu Rakshak landslide susceptibility, infrastructure exposure, connectivity, and reporting API. "
             "Scores are risk estimates, not deterministic event predictions."
         ),
         lifespan=lifespan,
@@ -38,6 +39,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.database = Database(settings.database_url)
     app.state.services = ServiceContainer(settings)
     app.add_middleware(RequestContextMiddleware)
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=settings.frontend_origin_list,
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
+        allow_headers=["Content-Type", "Authorization", "X-Authority-Key", "X-Sensor-Secret"],
+    )
     register_exception_handlers(app)
     app.include_router(api_router, prefix=settings.api_v1_prefix)
     return app

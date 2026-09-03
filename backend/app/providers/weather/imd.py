@@ -96,14 +96,14 @@ class IMDWeatherProvider(WeatherProvider):
         result = await self._request(self.settings.imd_current_path, {"latitude": latitude, "longitude": longitude})
         if isinstance(result, ProviderStatus):
             return result
-        return ProviderStatus(
-            provider=self.name,
-            status="schema_mapping_required",
-            live=False,
-            enabled=True,
-            configured=True,
-            message="The official endpoint responded, but its approved response schema must be mapped before use.",
-        )
+        raw = result["raw"]
+        required = {"observation_time", "rainfall_24h_mm"}
+        if not isinstance(raw, dict) or not required.issubset(raw):
+            return ProviderStatus(provider=self.name, status="schema_mapping_required", live=False, enabled=True, configured=True, message="The response must expose the configured normalized IMD fields before operational use.")
+        try:
+            return WeatherObservation(provider="imd", source=str(raw.get("source") or "India Meteorological Department"), observation_time=raw["observation_time"], received_at=result["received_at"], live=True, status="available", quality=str(raw.get("data_quality") or "official_provider"), rainfall_1h_mm=raw.get("rainfall_1h_mm"), rainfall_24h_mm=raw.get("rainfall_24h_mm"), rainfall_72h_mm=raw.get("rainfall_72h_mm"), rainfall_7d_mm=raw.get("rainfall_7d_mm"), temperature_c=raw.get("temperature_c"), humidity_percent=raw.get("humidity_percent"), forecast_rainfall_mm=raw.get("forecast_rainfall_mm"), confidence=str(raw.get("confidence") or "official"), location={"latitude": latitude, "longitude": longitude}, provenance={"provider": "imd", "warnings": raw.get("warnings", []), "raw_fields_used": sorted(required)})
+        except (ValueError, TypeError):
+            return ProviderStatus(provider=self.name, status="schema_mapping_required", live=False, enabled=True, configured=True, message="IMD normalized fields failed validation; no values were fabricated.")
 
     async def get_recent_rainfall(
         self, latitude: float, longitude: float, *, at: datetime | None = None

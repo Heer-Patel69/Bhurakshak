@@ -71,7 +71,8 @@ def test_sensor_validation_and_ingest(client):
     assert response.json()["source"] == "test_fixture"
     status_response = client.get("/api/v1/sensors/status")
     assert status_response.status_code == 200
-    assert status_response.json()["status"] == "available"
+    assert status_response.json()["status"] == "operational"
+    assert status_response.json()["connected_sensor_count"] == 1
 
 
 def test_citizen_report_is_idempotent_and_verifiable(client):
@@ -102,4 +103,3 @@ def test_citizen_report_is_idempotent_and_verifiable(client):
     assert verified.status_code == 200
     assert verified.json()["report"]["verification_status"] == "verified"
     assert verified.json()["incident_id"] is not None
-

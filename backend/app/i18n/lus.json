@@ -1,0 +1,17 @@
+{
+  "review_status": "REQUIRES HUMAN / AUTHORITY LANGUAGE REVIEW",
+  "low_risk": "Hlauhawmna hniam",
+  "medium_risk": "Hlauhawmna laihawl",
+  "high_risk": "Hlauhawmna sang",
+  "critical_risk": "Hlauhawmna nasa tak",
+  "road_high_risk": "Kawng a hlauhawm nasa",
+  "road_closed": "Kawng chu sorkar thu-in khar a ni",
+  "potential_isolation": "Inthiarfihlna thleng thei",
+  "confirmed_isolation": "Inthiarfihlna nemngheh",
+  "move_away": "Tlang kam nghet lo bul atangin insawn rawh.",
+  "avoid_road": "Kawng tuar chu pumpelh rawh.",
+  "follow_authority": "Sorkar hotute thupek zawm rawh.",
+  "contact_emergency": "Hlauhawmna rang tak a awm chuan emergency service biak rawh.",
+  "avoid_debris": "Min tla hnuhma hnaih suh.",
+  "evacuate": "Hotuten an hrilh chuan himna hmunah kal rawh."
+}

@@ -118,7 +118,7 @@ class RiskPointResponse(APIModel):
     missing_signals: list[str]
     generated_at: datetime
     data_timestamp: datetime | None = None
-    assessment_context: Literal["operational", "historical_reference_scenario"]
+    assessment_context: Literal["live_operational", "historical_reference_scenario", "degraded_current"]
 
 
 class ReportCategory(StrEnum):
@@ -130,6 +130,7 @@ class ReportCategory(StrEnum):
     slope_movement = "slope_movement"
     collapsed_retaining_wall = "collapsed_retaining_wall"
     flash_flood = "flash_flood"
+    landslide = "landslide"
     unknown = "unknown"
 
 
@@ -153,6 +154,13 @@ class CitizenReportCreate(Location):
     media_size_bytes: int | None = Field(default=None, ge=0)
     language: Literal["en", "hi", "lus"] = "en"
     location_source: Literal["device_gps", "media_exif", "manual_pin"]
+    reporter_type: Literal["citizen", "field_official", "authority"] = "citizen"
+    place_name: str | None = Field(default=None, max_length=240)
+    landmark: str | None = Field(default=None, max_length=500)
+    road_name: str | None = Field(default=None, max_length=240)
+    district: str | None = Field(default=None, max_length=128)
+    severity_observed: Literal["low", "medium", "high", "critical", "unknown"] | None = None
+    offline_created_at: datetime | None = None
 
     @field_validator("timestamp")
     @classmethod
@@ -202,12 +210,65 @@ class CitizenReportRead(APIModel):
     incident_id: str | None
     created_at: datetime
     updated_at: datetime
+    reporter_type: str
+    place_name: str | None
+    landmark: str | None
+    road_name: str | None
+    district: str | None
+    severity_observed: str | None
+    created_offline: bool
+    client_created_at: datetime | None
+    sync_status: str
+    verification_note: str | None
+    affected_road_id: str | None
+    authority_action_id: str | None
+    client_report_id: str | None = None
+    gps_accuracy_m: float | None = None
+    captured_at: datetime | None = None
+    server_received_at: datetime | None = None
+    media_status: Literal["none", "pending", "uploaded"] = "none"
+    location: Location | None = None
+    next_steps: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def frontend_contract(self):
+        self.client_report_id = self.client_generated_id
+        self.gps_accuracy_m = self.accuracy_m
+        self.captured_at = self.observed_at
+        self.server_received_at = self.created_at
+        self.location = Location(latitude=self.latitude, longitude=self.longitude)
+        self.media_status = "pending" if self.sync_status == "pending_media" else ("uploaded" if self.media_url else "none")
+        self.next_steps = ["Keep the report ID for offline sync.", "Await authority verification."] if self.verification_status == "pending" else ["Follow authority instructions."]
+        return self
 
 
 class ReportVerification(APIModel):
     status: Literal["under_review", "verified", "rejected"]
     verified_by: str = Field(min_length=1, max_length=128)
     severity: Literal["low", "medium", "high", "critical", "unknown"] = "unknown"
+    category: ReportCategory | None = None
+    verification_note: str | None = Field(default=None, max_length=2_000)
+    affected_road_id: str | None = Field(default=None, max_length=128)
+    confirmed_road_blockage: bool = False
+
+
+class CopilotAdviceRequest(Location):
+    language: Literal["en", "hi", "lus"] = "en"
+    question: str | None = Field(default=None, max_length=1_000)
+
+
+class CopilotAdviceResponse(APIModel):
+    summary: str
+    recommended_actions: list[str]
+    avoid: list[str]
+    emergency_information: list[str]
+    why: list[str]
+    confidence_note: str
+    language: Literal["en", "hi", "lus"]
+    generated_at: datetime
+    ai_available: bool
+    recommendations_source: Literal["groq_grounded", "deterministic_template"]
+    facts: dict[str, Any]
 
 
 class IncidentVerification(APIModel):
@@ -239,9 +300,29 @@ class SensorReadingCreate(Location):
         return normalized
 
 
+class RouteCoordinate(APIModel):
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+
+
 class RouteCompareRequest(APIModel):
-    source_node: str | int
-    destination_node: str | int
+    origin: RouteCoordinate
+    destination: RouteCoordinate
+
+
+class RoadStatusUpdate(APIModel):
+    status: Literal["open", "restricted", "hazard", "blocked", "officially_closed"]
+    source: Literal["authority", "official_closure", "verified_citizen_report"]
+    verified: bool = True
+    geometry: dict[str, Any] | None = None
+    observed_at: datetime | None = None
+    expires_at: datetime | None = None
+
+    @model_validator(mode="after")
+    def validate_closure(self):
+        if self.status == "officially_closed" and (not self.verified or self.source not in {"authority", "official_closure"}):
+            raise ValueError("Official closures require verified authority provenance")
+        return self
 
 
 class AlertCreate(APIModel):

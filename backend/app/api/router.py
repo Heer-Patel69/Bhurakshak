@@ -2,6 +2,8 @@ from fastapi import APIRouter
 
 from .routes import (
     alerts,
+    bootstrap,
+    copilot,
     authority,
     facilities,
     gis,
@@ -25,6 +27,7 @@ from .routes import (
 api_router = APIRouter()
 for router in (
     health.router,
+    bootstrap.router,
     system.router,
     risk.router,
     weather.router,
@@ -36,6 +39,7 @@ for router in (
     villages.router,
     facilities.router,
     routing.router,
+    copilot.router,
     reports.router,
     incidents.router,
     sensors.router,
@@ -44,4 +48,3 @@ for router in (
     sync.router,
 ):
     api_router.include_router(router)
-

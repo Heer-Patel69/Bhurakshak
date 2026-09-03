@@ -1,0 +1,17 @@
+{
+  "review_status": "Reviewed Bhu Rakshak safety template",
+  "low_risk": "कम जोखिम",
+  "medium_risk": "मध्यम जोखिम",
+  "high_risk": "उच्च जोखिम",
+  "critical_risk": "गंभीर जोखिम",
+  "road_high_risk": "सड़क पर उच्च जोखिम है",
+  "road_closed": "सड़क आधिकारिक रूप से बंद है",
+  "potential_isolation": "संपर्क टूटने की संभावना",
+  "confirmed_isolation": "संपर्क टूटने की पुष्टि",
+  "move_away": "अस्थिर ढलानों से दूर जाएँ।",
+  "avoid_road": "प्रभावित सड़क से बचें।",
+  "follow_authority": "स्थानीय प्रशासन के निर्देशों का पालन करें।",
+  "contact_emergency": "किसी को तत्काल खतरा हो तो आपातकालीन सेवाओं से संपर्क करें।",
+  "avoid_debris": "भूस्खलन के मलबे के पास न जाएँ।",
+  "evacuate": "प्रशासन के निर्देश पर सुरक्षित स्थान पर जाएँ।"
+}

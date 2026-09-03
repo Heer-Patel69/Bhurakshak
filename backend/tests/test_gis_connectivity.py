@@ -64,3 +64,38 @@ def test_isolation_scenario_is_labeled():
     assert results[0]["isolation_status"] == "potentially_isolated"
     assert results[0]["analysis_mode"] == "risk_scenario"
 
+
+def test_verified_official_closure_is_non_routable_but_unverified_is_not():
+    graph = nx.DiGraph()
+    graph.add_node("A", longitude=92.70, latitude=23.70)
+    graph.add_node("B", longitude=92.71, latitude=23.71)
+    graph.add_edge("A", "B", edge_id="r1", travel_time_s=10, length_m=100)
+    routing = RoutingService(graph=graph)
+    routing.set_status_overrides([{"road_id": "r1", "status": "officially_closed", "verified": False}])
+    assert routing.compare("A", "B")["fastest_route"]["distance_m"] == 100
+    routing.set_status_overrides([{"road_id": "r1", "status": "officially_closed", "verified": True}])
+    try:
+        routing.compare("A", "B")
+        assert False, "verified closure should remove the edge from routing"
+    except Exception as exc:
+        assert getattr(exc, "code", None) == "ROUTE_NOT_FOUND"
+
+
+def test_real_gis_artifacts_load_and_route(client):
+    roads = client.get("/api/v1/roads", params={"bbox": "92.71,23.72,92.72,23.73", "limit": 25})
+    assert roads.status_code == 200
+    assert 0 < len(roads.json()["features"]) <= 25
+    assert roads.json()["metadata"]["spatial_index"] if "spatial_index" in roads.json()["metadata"] else True
+
+    historical = client.get("/api/v1/gis/historical-landslides")
+    assert historical.status_code == 200
+    assert historical.json()["metadata"]["inventory_size"] == 572
+    assert any(feature["properties"]["date"] is None for feature in historical.json()["features"])
+
+    routing = client.app.state.services.routing
+    result = routing.compare_coordinates(
+        {"latitude": 23.7271, "longitude": 92.7176},
+        {"latitude": 23.75, "longitude": 92.73},
+    )
+    assert result["fastest_route"]["distance_m"] > 0
+    assert result["fastest_route"]["route_geometry"]["type"] == "LineString"

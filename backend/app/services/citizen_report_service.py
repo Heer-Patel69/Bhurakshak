@@ -24,23 +24,36 @@ class CitizenReportService:
         if client_id:
             existing = repository.get_by_client_id(client_id)
             if existing:
+                session.expunge(existing)
+                existing.sync_status = "duplicate"
                 return existing
         report = CitizenReportDB(
             report_id=client_id or str(uuid4()),
             client_generated_id=client_id,
             user_id=payload.user_id,
+            reporter_type=payload.reporter_type,
             latitude=payload.latitude,
             longitude=payload.longitude,
             accuracy_m=payload.accuracy_m,
             observed_at=payload.timestamp,
             category=payload.category.value,
             description_original=payload.description_original,
+            place_name=payload.place_name,
+            landmark=payload.landmark,
+            road_name=payload.road_name,
+            district=payload.district,
+            severity_observed=payload.severity_observed,
             transcript=payload.transcript,
             media_url=payload.media_url,
             media_mime_type=payload.media_mime_type,
             language=payload.language,
             location_source=payload.location_source,
-            verification_status="pending",
+            verification_status="verified" if payload.reporter_type == "authority" else "pending",
+            verified_by=payload.user_id if payload.reporter_type == "authority" else None,
+            verified_at=datetime.now(UTC) if payload.reporter_type == "authority" else None,
+            created_offline=payload.offline_created_at is not None,
+            client_created_at=payload.offline_created_at,
+            sync_status="pending_media" if payload.media_url else "synced",
         )
         return repository.add(report)
 
@@ -52,6 +65,10 @@ class CitizenReportService:
         report.verified_by = payload.verified_by
         report.verified_at = datetime.now(UTC)
         report.ai_severity = payload.severity
+        report.verification_note = payload.verification_note
+        report.affected_road_id = payload.affected_road_id
+        if payload.category:
+            report.category = payload.category.value
         report.updated_at = datetime.now(UTC)
         session.flush()
         return report
@@ -81,4 +98,3 @@ class CitizenReportService:
             raise TerraWatchError("UNSUPPORTED_MEDIA_TYPE", "The supplied media MIME type is not allowed.", status_code=415)
         if payload.media_size_bytes and payload.media_size_bytes > self.settings.max_upload_bytes:
             raise TerraWatchError("MEDIA_TOO_LARGE", "The supplied media exceeds the configured size limit.", status_code=413)
-

@@ -1,0 +1,17 @@
+{
+  "review_status": "Reviewed Bhu Rakshak safety template",
+  "low_risk": "Low risk",
+  "medium_risk": "Medium risk",
+  "high_risk": "High risk",
+  "critical_risk": "Critical risk",
+  "road_high_risk": "Road is high risk",
+  "road_closed": "Road is officially closed",
+  "potential_isolation": "Potential isolation",
+  "confirmed_isolation": "Confirmed isolation",
+  "move_away": "Move away from unstable slopes.",
+  "avoid_road": "Avoid the affected road.",
+  "follow_authority": "Follow local authority instructions.",
+  "contact_emergency": "Contact emergency services if anyone is in immediate danger.",
+  "avoid_debris": "Do not approach landslide debris.",
+  "evacuate": "Evacuate if instructed by authorities."
+}

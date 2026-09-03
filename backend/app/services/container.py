@@ -18,8 +18,10 @@ from .geo_service import GeoService, RiskGridService
 from .historical_susceptibility_service import HistoricalSusceptibilityService
 from .hybrid_risk_service import HybridRiskService, RiskOrchestrator
 from .incident_service import IncidentService
+from .i18n_service import I18nService
 from .isolation_service import IsolationService
 from .ml_service import MLModelService
+from .media_storage_service import MediaStorageService
 from .road_exposure_service import RoadExposureService
 from .routing_service import RoutingService
 from .satellite_service import SatelliteService
@@ -44,7 +46,9 @@ class ServiceContainer:
         self.sensor_provider = HTTPSensorProvider(settings)
         self.sensors = SensorService()
         self.reports = CitizenReportService(settings)
+        self.media = MediaStorageService(settings)
         self.incidents = IncidentService()
+        self.i18n = I18nService()
         self.hybrid = HybridRiskService(settings.risk_config_path)
         self.risk = RiskOrchestrator(
             weather_service=self.weather,
@@ -63,11 +67,10 @@ class ServiceContainer:
         )
         self.geo = GeoService()
         self.road_exposure = RoadExposureService()
-        self.routing = RoutingService(settings.road_graph_path)
+        self.routing = RoutingService(settings.road_graph_path, config_path=settings.routing_config_path)
         self.isolation = IsolationService()
         self.facility_access = FacilityAccessService(self.routing)
         self.alerts = AlertService(
             [ConsoleAlertProvider(), FirebaseAlertProvider(settings), SMSAlertProvider(settings)]
         )
         self.copilot = GroqCopilotService(settings)
-

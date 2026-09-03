@@ -1,6 +1,6 @@
-# TerraWatch backend
+# Bhu Rakshak backend
 
-Production-structured FastAPI foundation for the TerraWatch Aizawl pilot. The backend combines local historical/weather/terrain evidence, the existing experimental XGBoost susceptibility model, connectivity analysis interfaces, citizen reports, sensors, incidents, alerts, and provider health without claiming deterministic landslide prediction.
+Production-structured FastAPI foundation for the Bhu Rakshak Aizawl pilot. The backend combines local historical/weather/terrain evidence, the existing experimental XGBoost susceptibility model, connectivity analysis interfaces, citizen reports, sensors, incidents, alerts, and provider health without claiming deterministic landslide prediction.
 
 No code in this backend retrains the model or writes into `data/Cleaned/`, `data/generated/`, or `backend/models/`.
 
@@ -17,10 +17,11 @@ No code in this backend retrains the model or writes into `data/Cleaned/`, `data
 - SQLite persistence with PostgreSQL-compatible SQLAlchemy entities
 - idempotent offline report creation, verification, and incident clustering
 - protected sensor ingest and latest-reading lookup
-- generic road exposure, isolation, routing, and facility-access services
+- real Aizawl OSM roads, settlements, critical facilities, and directed routing graph
+- bbox-filtered/paginated GIS layers, indexed road-risk exposure, coordinate routing, isolation, and facility access
 - console/test alerts; disabled external alert providers
 
-Analytical OSM roads, village/facility layers, road graph, live IMD, satellite processing, Firebase, SMS, and Groq execution remain unavailable until their data pipelines or credentials are configured. Their APIs report that status instead of returning fake observations.
+Live IMD, satellite processing, Firebase, SMS, and Groq execution remain unavailable until their provider credentials are configured. Their APIs report that status instead of returning fake observations.
 
 ## Setup
 
@@ -41,9 +42,14 @@ Do not put the Supabase service-role key, sensor secret, authority key, SMS key,
 ```powershell
 Invoke-RestMethod http://127.0.0.1:8000/api/v1/health
 Invoke-RestMethod http://127.0.0.1:8000/api/v1/system/providers
+Invoke-RestMethod "http://127.0.0.1:8000/api/v1/roads?bbox=92.70,23.70,92.74,23.76&limit=100"
+Invoke-RestMethod http://127.0.0.1:8000/api/v1/gis/historical-landslides
 
 $body = @{ latitude = 23.7271; longitude = 92.7176 } | ConvertTo-Json
 Invoke-RestMethod http://127.0.0.1:8000/api/v1/risk/point -Method Post -ContentType application/json -Body $body
+
+$route = @{ origin = @{ latitude = 23.7271; longitude = 92.7176 }; destination = @{ latitude = 23.75; longitude = 92.73 } } | ConvertTo-Json -Depth 3
+Invoke-RestMethod http://127.0.0.1:8000/api/v1/routes/compare -Method Post -ContentType application/json -Body $route
 ```
 
 Without IMD configuration, point risk uses the most recent local CHIRPS record as a historical reference scenario. The response contains `assessment_context: historical_reference_scenario`, `live: false`, `live_weather` in missing signals, and reduced confidence.
@@ -68,4 +74,3 @@ Local startup creates missing SQLite tables for convenience. Use Alembic for man
 - [GIS pipeline](docs/gis_pipeline.md)
 - [Data provenance](docs/data_provenance.md)
 - [Limitations](docs/limitations.md)
-

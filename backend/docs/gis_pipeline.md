@@ -2,11 +2,11 @@
 
 ## Current status
 
-Risk points/grids work. Analytical road, village, facility, and OSM road-graph files are not present in the repository, so those layer endpoints truthfully return `not_configured`. No map tiles are used as analytical geometry.
+The Aizawl pilot uses a real Geofabrik North-Eastern Zone PBF clipped to `[92.60, 23.60, 92.85, 23.85]`. Preprocessing produced 116,763 physical road segments, a 115,929-node/232,947-directed-edge graph, 14 settlements, and 29 critical facilities. The exact provenance, counts, missing values, and geometry checks are in `data/gis/processed/gis_data_audit.md`. No map tiles are used as analytical geometry.
 
-## Expected inputs
+## Reproduction
 
-Set `ROADS_GEOJSON_PATH`, `VILLAGES_GEOJSON_PATH`, `FACILITIES_GEOJSON_PATH`, and `ROAD_GRAPH_PATH` to reviewed derivatives of an OSM/Geofabrik North-Eastern India extract. Stable IDs and source tags must be retained. Villages/facilities used for graph analysis require `nearest_node` properties. Graph edges should contain:
+Run `python backend/scripts/download_osm_geofabrik.py`, then `python backend/scripts/preprocess_aizawl_osm.py`. The downloader verifies Geofabrik's published MD5 and records source metadata. Preprocessing clips features, retains stable OSM IDs and original tags, derives geodesic length, applies configured speed assumptions only when OSM `maxspeed` is absent, and writes GeoJSON plus GraphML and compressed Joblib graphs.
 
 - `length_m`
 - `travel_time_s`
@@ -29,3 +29,4 @@ Isolation copies the graph and removes explicitly selected edges. `analysis_mode
 
 Facility access compares reachable hospitals/police/emergency nodes, distance, travel time, and route exposure. Safer routing uses travel time plus risk, verified blockage, and unverified-report penalties. Official closures are non-routable; unverified reports never close an edge.
 
+`GET /roads` is capped and supports `bbox`, `offset`, and `limit`. Static layers and their STRtree spatial indices are process-cached. The graph is loaded once from Joblib at service construction. Runtime risk and road-status overlays do not mutate the source artifact.

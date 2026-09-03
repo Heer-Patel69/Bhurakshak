@@ -12,6 +12,7 @@ from typing import Any
 import networkx as nx
 import osmium
 import yaml
+import joblib
 from pyproj import Geod
 from shapely.geometry import LineString, Point, Polygon, box, mapping
 
@@ -322,6 +323,7 @@ def process(pbf_path: Path, output_dir: Path, bbox_values: tuple[float, float, f
     settlements_path = output_dir / "aizawl_settlements.geojson"
     facilities_path = output_dir / "aizawl_facilities.geojson"
     graph_path = output_dir / "aizawl_road_graph.graphml"
+    graph_joblib_path = output_dir / "aizawl_road_graph.joblib"
     roads_path.write_text(json.dumps(feature_collection(handler.roads, {**common_metadata, "layer": "roads"})), encoding="utf-8")
     settlements_path.write_text(
         json.dumps(feature_collection(handler.settlements, {**common_metadata, "layer": "settlements"})), encoding="utf-8"
@@ -331,6 +333,7 @@ def process(pbf_path: Path, output_dir: Path, bbox_values: tuple[float, float, f
     )
     handler.graph.graph.update({key: str(value) for key, value in common_metadata.items() if value is not None})
     nx.write_graphml(handler.graph, graph_path, infer_numeric_types=True)
+    joblib.dump(handler.graph, graph_joblib_path, compress=3)
 
     physical_length = sum(float(item["properties"]["length_m"]) for item in handler.roads)
     facility_counts = Counter(item["properties"]["facility_type"] for item in handler.facilities)
@@ -444,4 +447,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

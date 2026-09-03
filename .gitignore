@@ -4,6 +4,8 @@ __pycache__/
 *$py.class
 *.env
 .env
+!*.env.example
+!.env.example
 .venv/
 venv/
 ENV/
@@ -22,3 +24,13 @@ desktop.ini
 data/gis/raw/*.osm.pbf
 data/gis/raw/*.pbf
 data/gis/processed/*.graphml
+*.db
+*.sqlite3
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+.env*.local
+frontend/.env.local
+backend/.env

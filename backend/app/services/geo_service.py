@@ -3,18 +3,42 @@ from __future__ import annotations
 import json
 import math
 import time
+from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from shapely.geometry import box, shape
+from shapely.strtree import STRtree
 from sqlalchemy.orm import Session
 
 from ..core.exceptions import TerraWatchError
 from ..utils.geo import parse_bbox
 
 
+@dataclass
+class CachedGeoLayer:
+    modified_ns: int
+    payload: dict[str, Any]
+    geometries: list[Any] | None = None
+    tree: STRtree | None = None
+
+
 class GeoService:
-    def load_feature_collection(self, path: Path | None, *, layer: str) -> dict[str, Any]:
+    """Lazy, process-local cache for preprocessed analytical GeoJSON layers."""
+
+    def __init__(self) -> None:
+        self._cache: dict[Path, CachedGeoLayer] = {}
+
+    def load_feature_collection(
+        self,
+        path: Path | None,
+        *,
+        layer: str,
+        bbox: str | tuple[float, float, float, float] | None = None,
+        offset: int = 0,
+        limit: int | None = None,
+    ) -> dict[str, Any]:
         if path is None or not path.is_file():
             return {
                 "type": "FeatureCollection",
@@ -26,18 +50,91 @@ class GeoService:
                 },
             }
         try:
-            with path.open("r", encoding="utf-8") as handle:
-                payload = json.load(handle)
-            if payload.get("type") != "FeatureCollection":
-                raise ValueError("Expected a GeoJSON FeatureCollection")
-            payload["metadata"] = {"layer": layer, "status": "available", "source": str(path)}
-            return payload
+            cached = self._get_cached(path)
+            all_features = cached.payload.get("features", [])
+            if bbox is None:
+                indices = list(range(len(all_features)))
+            else:
+                bbox_values = parse_bbox(bbox) if isinstance(bbox, str) else bbox
+                self._ensure_spatial_index(cached)
+                assert cached.tree is not None
+                indices = sorted(int(value) for value in cached.tree.query(box(*bbox_values), predicate="intersects"))
+            matched_count = len(indices)
+            selected = indices[offset : offset + limit if limit is not None else None]
+            metadata = {
+                **cached.payload.get("metadata", {}),
+                "layer": layer,
+                "status": "available",
+                "artifact": str(path),
+                "total_feature_count": len(all_features),
+                "matched_feature_count": matched_count,
+                "returned_feature_count": len(selected),
+                "offset": offset,
+                "limit": limit,
+            }
+            return {
+                "type": "FeatureCollection",
+                "features": [all_features[index] for index in selected],
+                "metadata": metadata,
+            }
         except (OSError, ValueError, json.JSONDecodeError) as exc:
             return {
                 "type": "FeatureCollection",
                 "features": [],
                 "metadata": {"layer": layer, "status": "unavailable", "message": f"{type(exc).__name__}: {exc}"},
             }
+
+    def intersecting_features(
+        self,
+        path: Path | None,
+        geometries: list[Any],
+        *,
+        layer: str,
+    ) -> dict[str, Any]:
+        if path is None or not path.is_file():
+            return self.load_feature_collection(path, layer=layer)
+        cached = self._get_cached(path)
+        self._ensure_spatial_index(cached)
+        assert cached.tree is not None
+        indices: set[int] = set()
+        for geometry in geometries:
+            indices.update(int(value) for value in cached.tree.query(geometry, predicate="intersects"))
+        ordered = sorted(indices)
+        return {
+            "type": "FeatureCollection",
+            "features": [cached.payload["features"][index] for index in ordered],
+            "metadata": {
+                **cached.payload.get("metadata", {}),
+                "layer": layer,
+                "status": "available",
+                "artifact": str(path),
+                "total_feature_count": len(cached.payload.get("features", [])),
+                "matched_feature_count": len(ordered),
+                "returned_feature_count": len(ordered),
+                "spatial_index": "STRtree",
+            },
+        }
+
+    def _get_cached(self, path: Path) -> CachedGeoLayer:
+        resolved = path.resolve()
+        modified_ns = resolved.stat().st_mtime_ns
+        cached = self._cache.get(resolved)
+        if cached and cached.modified_ns == modified_ns:
+            return cached
+        with resolved.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+        if payload.get("type") != "FeatureCollection":
+            raise ValueError("Expected a GeoJSON FeatureCollection")
+        cached = CachedGeoLayer(modified_ns=modified_ns, payload=payload)
+        self._cache[resolved] = cached
+        return cached
+
+    @staticmethod
+    def _ensure_spatial_index(cached: CachedGeoLayer) -> None:
+        if cached.tree is not None:
+            return
+        cached.geometries = [shape(feature["geometry"]) for feature in cached.payload.get("features", [])]
+        cached.tree = STRtree(cached.geometries)
 
 
 class RiskGridService:

@@ -163,7 +163,7 @@ class RiskOrchestrator:
 
         evaluated = self.hybrid.evaluate_scores(signal_data)
         assessment_context = (
-            "operational" if isinstance(weather, WeatherObservation) and weather.live else "historical_reference_scenario"
+            "live_operational" if isinstance(weather, WeatherObservation) and weather.live else "historical_reference_scenario"
         )
         if assessment_context == "historical_reference_scenario" and "live_weather" not in evaluated["missing_signals"]:
             evaluated["missing_signals"].append("live_weather")

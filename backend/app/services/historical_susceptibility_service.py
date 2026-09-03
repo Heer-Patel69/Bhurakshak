@@ -7,6 +7,7 @@ import pandas as pd
 
 from ..models.schemas import HistoricalSusceptibility
 from ..utils.geo import haversine_many_m
+from ..utils.geo import parse_bbox
 
 
 class HistoricalSusceptibilityService:
@@ -19,13 +20,17 @@ class HistoricalSusceptibilityService:
         self.latitudes = np.array([], dtype=float)
         self.longitudes = np.array([], dtype=float)
         self.normalizer = 1.0
+        self.frame = pd.DataFrame()
+        self.density_scores = np.array([], dtype=float)
         self.load_error: str | None = None
         self._load()
 
     def _load(self) -> None:
         try:
-            frame = pd.read_csv(self.inventory_path, usecols=["latitude", "longitude"])
-            frame = frame.dropna().astype(float)
+            columns = ["event_id", "date_parsed", "date_status", "district", "latitude", "longitude"]
+            frame = pd.read_csv(self.inventory_path, usecols=columns).dropna(subset=["latitude", "longitude"])
+            frame[["latitude", "longitude"]] = frame[["latitude", "longitude"]].astype(float)
+            self.frame = frame.reset_index(drop=True)
             self.latitudes = frame["latitude"].to_numpy()
             self.longitudes = frame["longitude"].to_numpy()
             densities = []
@@ -33,10 +38,13 @@ class HistoricalSusceptibilityService:
                 distances = haversine_many_m(latitude, longitude, self.latitudes, self.longitudes)
                 densities.append(float(np.exp(-distances / self.bandwidth_m).sum()))
             self.normalizer = max(1.0, float(np.percentile(densities, self.normalization_percentile)))
+            self.density_scores = np.minimum(1.0, np.asarray(densities) / self.normalizer)
             self.load_error = None
         except Exception as exc:
             self.latitudes = np.array([], dtype=float)
             self.longitudes = np.array([], dtype=float)
+            self.frame = pd.DataFrame()
+            self.density_scores = np.array([], dtype=float)
             self.load_error = f"{type(exc).__name__}: {exc}"
 
     def health(self) -> dict:
@@ -74,3 +82,17 @@ class HistoricalSusceptibilityService:
             ),
         )
 
+    def feature_collection(self, bbox: str | None = None) -> dict:
+        bounds = parse_bbox(bbox) if bbox else None
+        features = []
+        for index, row in self.frame.iterrows():
+            lon, lat = float(row["longitude"]), float(row["latitude"])
+            if bounds and not (bounds[0] <= lon <= bounds[2] and bounds[1] <= lat <= bounds[3]):
+                continue
+            date_value = None if pd.isna(row["date_parsed"]) else str(row["date_parsed"])
+            features.append({
+                "type": "Feature", "id": str(row["event_id"]),
+                "geometry": {"type": "Point", "coordinates": [lon, lat]},
+                "properties": {"event_id": str(row["event_id"]), "date": date_value, "date_status": str(row["date_status"]), "district": str(row["district"]), "historical_susceptibility_score": round(float(self.density_scores[index]), 4), "source": "Geological Survey of India"},
+            })
+        return {"type": "FeatureCollection", "features": features, "metadata": {"status": "available" if self.latitudes.size else "unavailable", "source": "GSI historical landslide inventory", "inventory_size": int(self.latitudes.size), "returned_feature_count": len(features), "undated_events_are_null": True, "methodology": f"Exponential distance-decay density ({self.bandwidth_m:.0f} m bandwidth)"}}

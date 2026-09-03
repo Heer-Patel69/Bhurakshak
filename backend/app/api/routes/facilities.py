@@ -13,7 +13,12 @@ def facilities(request: Request) -> dict:
 
 
 @router.get("/accessibility")
-def accessibility(request: Request, source_node: str = Query()) -> dict:
+def accessibility(
+    request: Request,
+    latitude: float | None = Query(default=None, ge=-90, le=90),
+    longitude: float | None = Query(default=None, ge=-180, le=180),
+    village_id: str | None = Query(default=None),
+) -> dict:
     collection = request.app.state.services.geo.load_feature_collection(
         request.app.state.settings.facilities_geojson_path,
         layer="facilities",
@@ -30,5 +35,15 @@ def accessibility(request: Request, source_node: str = Query()) -> dict:
                     "nearest_node": properties["nearest_node"],
                 }
             )
-    return request.app.state.services.facility_access.assess(source_node, facility_nodes)
-
+    services, settings = request.app.state.services, request.app.state.settings
+    source_node = None
+    if village_id:
+        villages = services.geo.load_feature_collection(settings.villages_geojson_path, layer="villages")
+        match = next((f for f in villages.get("features", []) if str(f.get("id")) == village_id or str(f.get("properties", {}).get("place_id")) == village_id), None)
+        if match:
+            source_node = match["properties"].get("nearest_node")
+    elif latitude is not None and longitude is not None:
+        source_node = services.routing.nearest_node(latitude, longitude)[0]
+    if source_node is None:
+        return {"accessibility_status": "invalid_origin", "message": "Provide latitude and longitude, or a valid village_id."}
+    return services.facility_access.assess(source_node, facility_nodes)

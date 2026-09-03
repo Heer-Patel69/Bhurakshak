@@ -8,6 +8,7 @@ All endpoints are under `/api/v1`. Interactive OpenAPI documentation is availabl
 |---|---|---|
 | GET | `/health` | Database, model, historical, and terrain health |
 | GET | `/system/providers` | Weather, satellite, alert, sensor, ML, GIS, graph, and copilot status |
+| GET | `/bootstrap` | Lightweight public frontend startup contract |
 
 ## Risk and source signals
 
@@ -17,8 +18,10 @@ All endpoints are under `/api/v1`. Interactive OpenAPI documentation is availabl
 | GET | `/risk/grid?bbox=west,south,east,north&resolution=10` | Bounded/cached GeoJSON point grid |
 | GET | `/weather/current` | Live provider if available, otherwise labeled historical fallback |
 | GET | `/weather/history` | Archived CHIRPS observation on/before a timestamp |
+| GET | `/weather/status` | Explicit live and historical provider modes |
 | GET | `/terrain/point` | Static terrain sample with sampled coordinate and distance |
 | GET | `/historical/susceptibility` | GSI distance-decay spatial evidence |
+| GET | `/historical/events` | All GSI events as filterable GeoJSON |
 | GET | `/satellite/latest` | Latest-observation provider state; never called live satellite |
 
 Point input:
@@ -38,18 +41,23 @@ The response separates `risk_score` from `confidence_score`, includes every sign
 | Method | Path | Purpose |
 |---|---|---|
 | GET | `/gis/layers` | Analytical layer availability |
-| GET | `/roads` | Configured road GeoJSON or `not_configured` |
+| GET | `/gis/historical-landslides` | GSI event GeoJSON with null undated dates and density score |
+| GET | `/roads?bbox=...&offset=0&limit=5000` | Capped, spatially filtered road GeoJSON |
 | GET | `/roads/exposure` | Risk intersection; exposure does not mean closure |
+| PATCH | `/roads/{road_id}/status` | Protected verified authority road status update |
 | GET | `/villages` | Configured village GeoJSON |
 | GET | `/villages/isolation` | `confirmed_closure` or `risk_scenario` graph analysis |
 | GET | `/facilities` | Configured critical-facility GeoJSON |
-| GET | `/accessibility?source_node=...` | Nearest accessible facility via safer routing |
+| GET | `/accessibility?latitude=...&longitude=...` | Nearest hospital/emergency and alternative via safer routing |
 | POST | `/routes/compare` | Fastest versus safer route |
 
 Routing input:
 
 ```json
-{"source_node": "123", "destination_node": "456"}
+{
+  "origin": {"latitude": 23.7271, "longitude": 92.7176},
+  "destination": {"latitude": 23.75, "longitude": 92.73}
+}
 ```
 
 Official closures are non-routable. Verified blockage reports receive a severe penalty. Unverified reports may add cost but never close an edge.
@@ -59,6 +67,8 @@ Official closures are non-routable. Verified blockage reports receive a severe p
 | Method | Path | Authentication |
 |---|---|---|
 | POST | `/reports` | Public ingest; idempotent client UUID supported |
+| POST | `/reports/{id}/media` | Validated image/video upload to private Supabase Storage |
+| GET | `/reports/{id}/media` | Authority-only metadata and time-limited signed URLs |
 | GET | `/reports` | Authority key |
 | PATCH | `/reports/{id}/verify` | Authority key |
 | GET | `/incidents` | Authority key |
@@ -68,6 +78,7 @@ Official closures are non-routable. Verified blockage reports receive a severe p
 | GET | `/alerts` | None |
 | POST | `/alerts` | Authority key |
 | GET | `/authority/overview` | Authority key |
+| POST | `/copilot/advice` | Grounded Groq guidance with deterministic fallback |
 | GET | `/sync/changes?since=...` | None in pilot; scope with auth before production |
 
 Use `X-Sensor-Secret`, `X-Authority-Key`, or a Bearer token containing the corresponding configured value. Missing server-side secrets disable protected operations rather than opening them.

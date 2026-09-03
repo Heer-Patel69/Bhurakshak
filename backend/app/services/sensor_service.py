@@ -39,11 +39,15 @@ class SensorService:
     def status(self, session: Session) -> dict:
         readings = SensorsRepository(session).latest()
         if not readings:
-            return {"status": "no_sensor_connected", "live": False, "readings": [], "count": 0}
+            return {"status": "no_sensor_connected", "live": False, "readings": [], "count": 0, "connected_sensor_count": 0, "latest_reading_at": None}
+        latest_at = max(ensure_utc(item.observed_at) for item in readings)
+        age = (datetime.now(UTC) - latest_at).total_seconds()
         return {
-            "status": "available",
+            "status": "operational" if age <= 3600 else "stale",
             "live": False,
             "count": len(readings),
+            "connected_sensor_count": len(readings),
+            "latest_reading_at": latest_at.isoformat(),
             "readings": [self.serialize(item) for item in readings],
         }
 
@@ -89,4 +93,3 @@ class SensorService:
             "battery_percent": reading.battery_percent,
             "source": reading.source,
         }
-

@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from ...core.security import require_authority_key
 from ...dependencies import get_db_session
-from ...models.database import AlertDB, CitizenReportDB, IncidentDB, RiskSnapshotDB
+from ...models.database import AlertDB, CitizenReportDB, IncidentDB, RiskSnapshotDB, RoadStatusDB
 
 
 router = APIRouter(prefix="/authority", tags=["authority"])
@@ -26,6 +26,7 @@ def authority_overview(request: Request, session: Session = Depends(get_db_sessi
         )
     )
     alerts = list(session.scalars(select(AlertDB).order_by(AlertDB.created_at.desc()).limit(20)))
+    closures = list(session.scalars(select(RoadStatusDB).where(RoadStatusDB.status == "officially_closed", RoadStatusDB.verified.is_(True)).limit(100)))
     sensor_status = services.sensors.status(session)
     overall = max((item.risk_score for item in latest_risk), default=None)
     return {
@@ -36,14 +37,17 @@ def authority_overview(request: Request, session: Session = Depends(get_db_sessi
             "status": "available" if latest_risk else "no_snapshot_available",
         },
         "high_critical_risk_zones": high_zones,
-        "affected_roads": {"status": "not_evaluated_without_configured_geometry", "items": []},
+        "confirmed_closures": [{"road_id": item.road_id, "source": item.source, "observed_at": item.observed_at} for item in closures],
+        "affected_roads": {"status": "available", "items": [item.road_id for item in closures]},
         "potentially_isolated_villages": {"status": services.routing.health()["status"], "items": []},
         "hospital_accessibility": {"status": services.routing.health()["status"], "items": []},
         "latest_citizen_reports": [item.report_id for item in reports],
+        "pending_report_count": int(session.scalar(select(func.count()).select_from(CitizenReportDB).where(CitizenReportDB.verification_status == "pending")) or 0),
         "verified_incidents": [item.incident_id for item in incidents],
         "sensor_status": sensor_status,
         "weather_provider_status": services.weather.health(),
         "satellite_provider_status": services.satellite.health(),
+        "media_storage_status": services.media.health(),
         "alerts": [item.alert_id for item in alerts],
         "data_freshness": {
             "latest_risk_generated_at": latest_risk[0].generated_at if latest_risk else None,

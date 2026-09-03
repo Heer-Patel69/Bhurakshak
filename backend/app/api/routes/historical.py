@@ -12,3 +12,7 @@ def historical_susceptibility(
 ) -> dict:
     return request.app.state.services.historical.score(latitude, longitude).model_dump(mode="json")
 
+
+@router.get("/events")
+def historical_events(request: Request, bbox: str | None = Query(default=None)) -> dict:
+    return request.app.state.services.historical.feature_collection(bbox)
