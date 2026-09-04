@@ -172,10 +172,17 @@ class RiskGridService:
         if cached and now_monotonic - cached[0] <= self.cache_seconds:
             return {**cached[1], "cache": "hit"}
         features = []
+        cell_width = (east - west) / resolution
+        cell_height = (north - south) / resolution
+        assessment_context = "historical_reference_scenario"
         for row in range(resolution):
-            latitude = south + (north - south) * row / (resolution - 1)
+            cell_south = south + cell_height * row
+            cell_north = cell_south + cell_height
+            latitude = (cell_south + cell_north) / 2
             for column in range(resolution):
-                longitude = west + (east - west) * column / (resolution - 1)
+                cell_west = west + cell_width * column
+                cell_east = cell_west + cell_width
+                longitude = (cell_west + cell_east) / 2
                 result = await self.orchestrator.point(
                     session,
                     latitude=latitude,
@@ -184,6 +191,7 @@ class RiskGridService:
                     persist=False,
                 )
                 signals = result.signals
+                assessment_context = result.assessment_context
                 properties = {
                     "risk_score": result.risk_score,
                     "risk_level": result.risk_level,
@@ -195,12 +203,27 @@ class RiskGridService:
                     "generated_at": result.generated_at.isoformat(),
                     "data_age_seconds": signals["rainfall"].get("data_age_seconds"),
                     "assessment_context": result.assessment_context,
+                    "context": result.assessment_context,
+                    "data_sources": ", ".join(
+                        f"{item['signal']}:{item['status']}" for item in result.data_sources
+                    ),
+                    "center_longitude": longitude,
+                    "center_latitude": latitude,
                 }
                 features.append(
                     {
                         "type": "Feature",
                         "id": f"risk-{row}-{column}",
-                        "geometry": {"type": "Point", "coordinates": [longitude, latitude]},
+                        "geometry": {
+                            "type": "Polygon",
+                            "coordinates": [[
+                                [cell_west, cell_south],
+                                [cell_east, cell_south],
+                                [cell_east, cell_north],
+                                [cell_west, cell_north],
+                                [cell_west, cell_south],
+                            ]],
+                        },
                         "properties": properties,
                     }
                 )
@@ -211,7 +234,8 @@ class RiskGridService:
                 "bbox": [west, south, east, north],
                 "resolution": resolution,
                 "cell_count": len(features),
-                "method": "point grid",
+                "method": "backend_hybrid_polygon_grid",
+                "assessment_context": assessment_context,
                 "generated_at": datetime.now().astimezone().isoformat(),
             },
             "cache": "miss",

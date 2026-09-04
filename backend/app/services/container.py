@@ -22,6 +22,7 @@ from .i18n_service import I18nService
 from .isolation_service import IsolationService
 from .ml_service import MLModelService
 from .media_storage_service import MediaStorageService
+from .place_search_service import PlaceSearchService
 from .road_exposure_service import RoadExposureService
 from .routing_service import RoutingService
 from .satellite_service import SatelliteService
@@ -66,6 +67,12 @@ class ServiceContainer:
             cache_seconds=settings.risk_grid_cache_seconds,
         )
         self.geo = GeoService()
+        self.places = PlaceSearchService(
+            self.geo,
+            settlements_path=settings.villages_geojson_path,
+            facilities_path=settings.facilities_geojson_path,
+            roads_path=settings.roads_geojson_path,
+        )
         self.road_exposure = RoadExposureService()
         self.routing = RoutingService(settings.road_graph_path, config_path=settings.routing_config_path)
         self.isolation = IsolationService()

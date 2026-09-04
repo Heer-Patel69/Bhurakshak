@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import logging
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,7 @@ class MLModelService:
         self.model: Any | None = None
         self.schema: dict[str, Any] = {}
         self.load_error: str | None = None
+        self.loaded_at: datetime | None = None
         self.load()
 
     def load(self) -> None:
@@ -35,12 +37,14 @@ class MLModelService:
             if model_features is not None and list(model_features) != expected:
                 raise ValueError(f"Model feature order {list(model_features)} does not match schema {expected}")
             self.load_error = None
+            self.loaded_at = datetime.now(UTC)
             logger.info(
                 "Susceptibility model loaded",
                 extra={"event": "model_loaded", "provider": self.schema.get("model_name")},
             )
         except Exception as exc:
             self.model = None
+            self.loaded_at = None
             self.load_error = f"{type(exc).__name__}: {exc}"
             logger.exception("Model load failed; backend will degrade gracefully", extra={"event": "model_load_failed"})
 
@@ -50,6 +54,7 @@ class MLModelService:
 
     def health(self) -> dict[str, Any]:
         return {
+            "available": self.model is not None,
             "status": "available" if self.model is not None else "unavailable",
             "model_name": self.schema.get("model_name", "unknown"),
             "model_version": self.schema.get("model_version", "unknown"),
@@ -57,6 +62,9 @@ class MLModelService:
                 "model_type", "experimental_storm_conditioned_spatial_susceptibility"
             ),
             "loaded": self.model is not None,
+            "model_loaded": self.model is not None,
+            "features": self.expected_features,
+            "loaded_at": self.loaded_at.isoformat() if self.loaded_at else None,
             "message": self.load_error,
         }
 
@@ -98,4 +106,3 @@ class MLModelService:
                 status="prediction_failed",
                 message=f"Controlled model degradation: {type(exc).__name__}",
             )
-

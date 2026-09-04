@@ -53,7 +53,8 @@ export async function saveQueuedReport(report: OfflineQueuedReport): Promise<voi
 
 export async function getPendingReports(): Promise<OfflineQueuedReport[]> {
   const db = await getOfflineDB();
-  return db.getAllFromIndex('reports_queue', 'by-status', 'pending');
+  const reports = await db.getAll('reports_queue');
+  return reports.filter((report) => report.status === 'pending' || report.status === 'failed');
 }
 
 export async function getAllQueuedReports(): Promise<OfflineQueuedReport[]> {

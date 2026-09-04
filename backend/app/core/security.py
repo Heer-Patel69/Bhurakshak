@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import secrets
 
+import httpx
 from fastapi import Request
 
 from .exceptions import TerraWatchError
@@ -31,14 +32,60 @@ async def require_sensor_secret(request: Request) -> None:
 
 
 async def require_authority_key(request: Request) -> None:
-    configured = request.app.state.settings.authority_api_key
-    if not configured:
+    settings = request.app.state.settings
+    authorization = request.headers.get("Authorization", "")
+    if authorization.lower().startswith("bearer "):
+        token = authorization[7:].strip()
+        if not settings.supabase_url or not settings.supabase_anon_key:
+            raise TerraWatchError(
+                "SUPABASE_AUTH_NOT_CONFIGURED",
+                "Supabase Auth JWT verification requires SUPABASE_URL and SUPABASE_ANON_KEY.",
+                status_code=503,
+            )
+        try:
+            async with httpx.AsyncClient(timeout=10) as client:
+                response = await client.get(
+                    f"{settings.supabase_url.rstrip('/')}/auth/v1/user",
+                    headers={"apikey": settings.supabase_anon_key, "Authorization": f"Bearer {token}"},
+                )
+        except httpx.HTTPError as exc:
+            raise TerraWatchError(
+                "SUPABASE_AUTH_UNAVAILABLE",
+                f"Supabase Auth verification is temporarily unavailable ({type(exc).__name__}).",
+                status_code=503,
+            ) from exc
+        if response.status_code != 200:
+            raise TerraWatchError("INVALID_AUTHORITY_CREDENTIALS", "Invalid or expired Supabase session.", status_code=401)
+        user = response.json()
+        app_metadata = user.get("app_metadata") if isinstance(user, dict) else {}
+        app_metadata = app_metadata if isinstance(app_metadata, dict) else {}
+        raw_roles = app_metadata.get("roles", [])
+        roles = {str(item).casefold() for item in raw_roles} if isinstance(raw_roles, list) else set()
+        if app_metadata.get("role"):
+            roles.add(str(app_metadata["role"]).casefold())
+        if not roles.intersection({"authority", "admin"}):
+            raise TerraWatchError(
+                "INSUFFICIENT_AUTHORITY_ROLE",
+                "A verified Supabase authority or admin role is required.",
+                status_code=403,
+            )
+        request.state.authority = {
+            "user_id": user.get("id"),
+            "email": user.get("email"),
+            "roles": sorted(roles),
+            "auth_mode": "supabase_jwt",
+        }
+        return
+
+    configured = settings.authority_api_key
+    development_fallback = settings.app_env.casefold() in {"development", "dev", "test", "local"}
+    if not development_fallback or not configured:
         raise TerraWatchError(
             "AUTHORITY_AUTH_NOT_CONFIGURED",
-            "Authority mutations are disabled until AUTHORITY_API_KEY is configured.",
+            "Supabase Auth is required. A server-side authority key is permitted only as a configured development fallback.",
             status_code=503,
         )
-    supplied = _extract_bearer_or_header(request, "X-Authority-Key")
+    supplied = request.headers.get("X-Authority-Key")
     if not supplied or not secrets.compare_digest(supplied, configured):
         raise TerraWatchError("INVALID_AUTHORITY_CREDENTIALS", "Invalid authority credentials.", status_code=401)
-
+    request.state.authority = {"roles": ["authority"], "auth_mode": "development_key"}

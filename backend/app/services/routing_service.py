@@ -58,7 +58,18 @@ class RoutingService:
         return {"status": "available" if self.graph is not None else "not_configured", "nodes": 0 if self.graph is None else self.graph.number_of_nodes(), "edges": 0 if self.graph is None else self.graph.number_of_edges(), "source": str(self.graph_path) if self.graph_path else None, "message": self.load_error}
 
     def set_risk_grid(self, grid: dict[str, Any] | None) -> None:
-        values = [(f["geometry"]["coordinates"][:2], float(f.get("properties", {}).get("risk_score", 0))) for f in (grid or {}).get("features", []) if f.get("geometry", {}).get("type") == "Point"]
+        values = []
+        for feature in (grid or {}).get("features", []):
+            geometry = feature.get("geometry", {})
+            properties = feature.get("properties", {})
+            if geometry.get("type") == "Point":
+                coordinates = geometry.get("coordinates", [])[:2]
+            elif geometry.get("type") == "Polygon":
+                coordinates = [properties.get("center_longitude"), properties.get("center_latitude")]
+            else:
+                continue
+            if len(coordinates) == 2 and all(value is not None for value in coordinates):
+                values.append((coordinates, float(properties.get("risk_score", 0))))
         self._risk_points = np.asarray([x[0] for x in values], dtype=float).reshape((-1, 2))
         self._risk_scores = np.asarray([x[1] for x in values], dtype=float)
         metadata = (grid or {}).get("metadata", {})
@@ -98,7 +109,32 @@ class RoutingService:
         except (nx.NodeNotFound, nx.NetworkXNoPath) as exc:
             raise TerraWatchError("ROUTE_NOT_FOUND", str(exc), status_code=404) from exc
         fastest, safer = self._summarize(fastest_nodes, False), self._summarize(safer_nodes, True)
-        return {"fastest_route": fastest, "safer_route": safer, "distance_difference_m": round(safer["distance_m"] - fastest["distance_m"], 1), "eta_difference_seconds": round(safer["eta_seconds"] - fastest["eta_seconds"], 1), "risk_exposure_difference": round(safer["risk_exposure_score"] - fastest["risk_exposure_score"], 1), "reason_safer_route_was_chosen": "Lower risk and verified-hazard penalty." if safer_nodes != fastest_nodes else "Fastest route is also the lowest-penalty available route.", "official_closures_are_non_routable": True, "unverified_reports_close_edges": False}
+        extra_distance = round(safer["distance_m"] - fastest["distance_m"], 1)
+        extra_time = round(safer["eta_seconds"] - fastest["eta_seconds"], 1)
+        fastest_risk = float(fastest["risk_exposure_score"])
+        safer_risk = float(safer["risk_exposure_score"])
+        reduction = max(0.0, ((fastest_risk - safer_risk) / fastest_risk * 100) if fastest_risk else 0.0)
+        alternative = safer_nodes != fastest_nodes and safer_risk < fastest_risk
+        reason = "Lower runtime risk exposure and verified-hazard penalty." if alternative else "Fastest route is also the lowest-penalty available route."
+        return {
+            "fastest_route": fastest,
+            "safer_route": safer,
+            "comparison": {
+                "risk_reduction_percent": round(reduction, 1),
+                "extra_travel_time_s": extra_time,
+                "extra_travel_time_minutes": round(extra_time / 60, 1),
+                "extra_distance_m": extra_distance,
+                "is_safer_alternative_available": alternative,
+                "recommended_route": "safer" if alternative else "fastest",
+                "advisory": reason,
+            },
+            "distance_difference_m": extra_distance,
+            "eta_difference_seconds": extra_time,
+            "risk_exposure_difference": round(safer_risk - fastest_risk, 1),
+            "reason_safer_route_was_chosen": reason,
+            "official_closures_are_non_routable": True,
+            "unverified_reports_close_edges": False,
+        }
 
     def rank_targets(self, source: Hashable, targets: Iterable[Hashable]) -> list[tuple[Hashable, dict[str, Any]]]:
         """Rank many destinations with one safer-route Dijkstra traversal."""
@@ -185,4 +221,4 @@ class RoutingService:
                 high_distance += length
                 affected.append(str(attrs.get("edge_id")))
         exposure = weighted / distance if distance else 0
-        return {"nodes": [str(n) for n in nodes], "distance_m": round(distance, 1), "eta_seconds": round(travel, 1), "travel_time_seconds": round(travel, 1), "risk_exposure_score": round(exposure, 1), "risk_exposure": round(exposure, 1), "high_risk_distance_m": round(high_distance, 1), "affected_segments": affected, "route_geometry": {"type": "LineString", "coordinates": coordinates}}
+        return {"nodes": [str(n) for n in nodes], "distance_m": round(distance, 1), "eta_seconds": round(travel, 1), "travel_time_seconds": round(travel, 1), "travel_time_s": round(travel, 1), "eta_minutes": round(travel / 60, 1), "risk_exposure_score": round(exposure, 1), "risk_exposure": round(exposure, 1), "mean_risk_score": round(exposure, 1), "high_risk_distance_m": round(high_distance, 1), "affected_segments": affected, "route_geometry": {"type": "LineString", "coordinates": coordinates}}

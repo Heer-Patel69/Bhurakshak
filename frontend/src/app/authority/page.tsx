@@ -12,6 +12,7 @@ import { EmergencyPriority } from '@/components/authority/EmergencyPriority';
 import { ProviderHealth } from '@/components/authority/ProviderHealth';
 import { AuthorityLoginModal } from '@/components/authority/AuthorityLoginModal';
 import { api } from '@/lib/api';
+import { clearAuthoritySession, getAuthoritySession } from '@/lib/supabaseAuth';
 import type { AuthorityOverviewResponse } from '@/lib/types';
 import { Radio, FileText, AlertTriangle, Road, Home, Hospital, Activity, Lock } from 'lucide-react';
 
@@ -23,7 +24,7 @@ export default function AuthorityPage() {
   const [loading, setLoading] = useState<boolean>(false);
 
   useEffect(() => {
-    const saved = localStorage.getItem('bhurakshak_authority_key');
+    const saved = getAuthoritySession();
     if (saved) {
       setAuthorityKey(saved);
       setIsAuthenticated(true);
@@ -36,12 +37,11 @@ export default function AuthorityPage() {
       const data = await api.getAuthorityOverview(key);
       setOverview(data);
       setIsAuthenticated(true);
-      localStorage.setItem('bhurakshak_authority_key', key);
     } catch (err) {
       console.warn('Authority login error:', err);
       alert('Authentication failed. Please check the authority security key.');
       setIsAuthenticated(false);
-      localStorage.removeItem('bhurakshak_authority_key');
+      clearAuthoritySession();
     } finally {
       setLoading(false);
     }
@@ -55,7 +55,7 @@ export default function AuthorityPage() {
   const handleLogout = () => {
     setAuthorityKey('');
     setIsAuthenticated(false);
-    localStorage.removeItem('bhurakshak_authority_key');
+    clearAuthoritySession();
   };
 
   return (

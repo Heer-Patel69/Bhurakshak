@@ -150,20 +150,26 @@ export function RiskPointModal({
               )}
 
               {/* Historical Susceptibility */}
-              {data.signals?.historical_susceptibility && (
-                <div className="bg-slate-950/40 p-2.5 rounded-lg border border-slate-800/60 space-y-0.5">
-                  <div className="flex items-center gap-1 text-slate-400 text-[10px] font-semibold">
-                    <History className="w-3 h-3 text-rose-400" />
-                    Historical Susc.
+              {(() => {
+                const hist = (data.signals?.historical || data.signals?.historical_susceptibility) as any;
+                if (!hist) return null;
+                const score = hist.historical_susceptibility_score;
+                const events = hist.historical_events_within_1km;
+                return (
+                  <div className="bg-slate-950/40 p-2.5 rounded-lg border border-slate-800/60 space-y-0.5">
+                    <div className="flex items-center gap-1 text-slate-400 text-[10px] font-semibold">
+                      <History className="w-3 h-3 text-rose-400" />
+                      Historical Susc.
+                    </div>
+                    <div className="text-slate-200 font-mono font-medium">
+                      {(Number(score || 0) * 100).toFixed(1)}%
+                    </div>
+                    <div className="text-slate-400 text-[10px]">
+                      {events ?? 0} events &lt;1km
+                    </div>
                   </div>
-                  <div className="text-slate-200 font-mono font-medium">
-                    {(data.signals.historical_susceptibility.historical_susceptibility_score * 100).toFixed(1)}%
-                  </div>
-                  <div className="text-slate-400 text-[10px]">
-                    {data.signals.historical_susceptibility.historical_events_within_1km} events &lt;1km
-                  </div>
-                </div>
-              )}
+                );
+              })()}
 
               {/* Rainfall / Weather */}
               {data.signals?.rainfall && (
@@ -174,7 +180,7 @@ export function RiskPointModal({
                   </div>
                   <div className="text-slate-200 font-mono font-medium">
                     {data.signals.rainfall.rainfall_24h_mm !== undefined && data.signals.rainfall.rainfall_24h_mm !== null
-                      ? `${data.signals.rainfall.rainfall_24h_mm.toFixed(1)} mm (24h)`
+                      ? `${Number(data.signals.rainfall.rainfall_24h_mm).toFixed(1)} mm (24h)`
                       : 'Unavailable'}
                   </div>
                   <div className="text-slate-400 text-[10px]">
@@ -184,22 +190,27 @@ export function RiskPointModal({
               )}
 
               {/* ML Model */}
-              {data.signals?.ml_susceptibility && (
-                <div className="bg-slate-950/40 p-2.5 rounded-lg border border-slate-800/60 space-y-0.5">
-                  <div className="flex items-center gap-1 text-slate-400 text-[10px] font-semibold">
-                    <Activity className="w-3 h-3 text-indigo-400" />
-                    ML Susceptibility
+              {(() => {
+                const ml = (data.signals?.ml || data.signals?.ml_susceptibility) as any;
+                if (!ml) return null;
+                const score = ml.ml_susceptibility_score ?? ml.susceptibility_score;
+                return (
+                  <div className="bg-slate-950/40 p-2.5 rounded-lg border border-slate-800/60 space-y-0.5">
+                    <div className="flex items-center gap-1 text-slate-400 text-[10px] font-semibold">
+                      <Activity className="w-3 h-3 text-indigo-400" />
+                      ML Susceptibility
+                    </div>
+                    <div className="text-slate-200 font-mono font-medium">
+                      {score !== undefined && score !== null
+                        ? `${(Number(score) * 100).toFixed(1)}%`
+                        : 'Not active'}
+                    </div>
+                    <div className="text-slate-400 text-[10px] truncate" title={ml.model_name}>
+                      {ml.model_name || 'XGBoost'}
+                    </div>
                   </div>
-                  <div className="text-slate-200 font-mono font-medium">
-                    {data.signals.ml_susceptibility.ml_susceptibility_score !== undefined && data.signals.ml_susceptibility.ml_susceptibility_score !== null
-                      ? `${(data.signals.ml_susceptibility.ml_susceptibility_score * 100).toFixed(1)}%`
-                      : 'Not active'}
-                  </div>
-                  <div className="text-slate-400 text-[10px] truncate" title={data.signals.ml_susceptibility.model_name}>
-                    {data.signals.ml_susceptibility.model_name || 'XGBoost'}
-                  </div>
-                </div>
-              )}
+                );
+              })()}
             </div>
           </div>
 

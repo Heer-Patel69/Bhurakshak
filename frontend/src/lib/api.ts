@@ -10,6 +10,7 @@ import type {
   FacilityFeature,
   HistoricalLandslidesResponse,
   IncidentItem,
+  PlaceSearchItem,
   ReportMediaItem,
   RiskGridResponse,
   RiskPointResponse,
@@ -71,19 +72,31 @@ async function fetchJson<T>(
 
     return (await response.json()) as T;
   } catch (error: any) {
-    if (error instanceof ApiError) throw error;
-    throw new ApiError(
+    const apiError = error instanceof ApiError ? error : new ApiError(
       'NETWORK_ERROR',
       error?.message || 'Failed to connect to Bhu Rakshak API server.',
       0
     );
+    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {
+      window.dispatchEvent(new CustomEvent('bhurakshak:api-error', {
+        detail: { endpoint, code: apiError.code, status: apiError.status, message: apiError.message },
+      }));
+    }
+    throw apiError;
   }
+}
+
+function authorityHeaders(credential: string): Record<string, string> {
+  return credential.split('.').length === 3
+    ? { Authorization: `Bearer ${credential}` }
+    : { 'X-Authority-Key': credential };
 }
 
 export const api = {
   // Bootstrap & Health
   getBootstrap: () => fetchJson<BootstrapResponse>('/api/v1/bootstrap'),
   getHealth: () => fetchJson<any>('/api/v1/health'),
+  getProviders: () => fetchJson<any>('/api/v1/system/providers'),
 
   // Risk Engine
   getRiskPoint: (latitude: number, longitude: number, timestamp?: string) =>
@@ -136,6 +149,11 @@ export const api = {
     return fetchJson<FacilityAccessibilityResponse>(`/api/v1/accessibility?${query.toString()}`);
   },
 
+  searchPlaces: (query: string, limit: number = 15) =>
+    fetchJson<{ items: PlaceSearchItem[]; count: number; source: string; query: string }>(
+      `/api/v1/places/search?q=${encodeURIComponent(query)}&limit=${limit}`
+    ),
+
   // Routing
   compareRoutes: (origin: { latitude: number; longitude: number }, destination: { latitude: number; longitude: number }) =>
     fetchJson<RouteCompareResponse>('/api/v1/routes/compare', {
@@ -184,11 +202,14 @@ export const api = {
     });
   },
 
+  getMapReports: () =>
+    fetchJson<{ type: 'FeatureCollection'; features: any[]; metadata: any }>('/api/v1/reports/map'),
+
   getReportMedia: (reportId: string, authorityKey: string) =>
     fetchJson<{ items: ReportMediaItem[]; count: number }>(
       `/api/v1/reports/${reportId}/media`,
       {
-        headers: { 'X-Authority-Key': authorityKey },
+        headers: authorityHeaders(authorityKey),
       }
     ),
 
@@ -199,14 +220,14 @@ export const api = {
   createAlert: (payload: any, authorityKey: string) =>
     fetchJson<{ alert_id: string; delivery_status: any }>('/api/v1/alerts', {
       method: 'POST',
-      headers: { 'X-Authority-Key': authorityKey },
+      headers: authorityHeaders(authorityKey),
       body: JSON.stringify(payload),
     }),
 
   // Authority Dashboard
   getAuthorityOverview: (authorityKey: string) =>
     fetchJson<AuthorityOverviewResponse>('/api/v1/authority/overview', {
-      headers: { 'X-Authority-Key': authorityKey },
+      headers: authorityHeaders(authorityKey),
     }),
 
   getAuthorityReports: (
@@ -218,7 +239,7 @@ export const api = {
     fetchJson<{ items: CitizenReportItem[]; count: number; offset: number; limit: number }>(
       `/api/v1/reports?offset=${offset}&limit=${limit}${verificationStatus ? `&verification_status=${verificationStatus}` : ''}`,
       {
-        headers: { 'X-Authority-Key': authorityKey },
+        headers: authorityHeaders(authorityKey),
       }
     ),
 
@@ -239,7 +260,7 @@ export const api = {
       `/api/v1/reports/${reportId}/verify`,
       {
         method: 'PATCH',
-        headers: { 'X-Authority-Key': authorityKey },
+        headers: authorityHeaders(authorityKey),
         body: JSON.stringify(payload),
       }
     ),
@@ -248,7 +269,7 @@ export const api = {
     fetchJson<{ items: IncidentItem[]; count: number }>(
       `/api/v1/incidents?limit=${limit}`,
       {
-        headers: { 'X-Authority-Key': authorityKey },
+        headers: authorityHeaders(authorityKey),
       }
     ),
 
@@ -259,7 +280,7 @@ export const api = {
   ) =>
     fetchJson<any>(`/api/v1/incidents/${incidentId}/verify`, {
       method: 'PATCH',
-      headers: { 'X-Authority-Key': authorityKey },
+      headers: authorityHeaders(authorityKey),
       body: JSON.stringify(payload),
     }),
 
@@ -275,7 +296,7 @@ export const api = {
   ) =>
     fetchJson<any>(`/api/v1/roads/${encodeURIComponent(roadId)}/status`, {
       method: 'PATCH',
-      headers: { 'X-Authority-Key': authorityKey },
+      headers: authorityHeaders(authorityKey),
       body: JSON.stringify(payload),
     }),
 };

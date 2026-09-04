@@ -1,5 +1,5 @@
-const CACHE_NAME = 'bhurakshak-v1';
-const STATIC_ASSETS = ['/', '/manifest.json', '/favicon.ico'];
+const CACHE_NAME = 'bhurakshak-v2';
+const STATIC_ASSETS = ['/', '/report', '/route', '/alerts', '/manifest.json', '/favicon.ico'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
@@ -31,11 +31,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  event.respondWith(
-    fetch(event.request).catch(() => {
-      return caches.match(event.request).then((res) => {
-        return res || caches.match('/');
-      });
-    })
-  );
+  event.respondWith(caches.match(event.request).then((cached) => cached || fetch(event.request).then((response) => {
+    if (event.request.method === 'GET' && response.ok) {
+      const copy = response.clone();
+      caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+    }
+    return response;
+  }).catch(() => caches.match('/'))));
 });

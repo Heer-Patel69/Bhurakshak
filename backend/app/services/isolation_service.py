@@ -46,6 +46,9 @@ class IsolationService:
                     "reachable_hospital": hospital_reachable,
                     "reachable_main_road": main_road_reachable,
                     "alternative_routes": int(hospital_reachable) + int(main_road_reachable),
+                    "hospital_reachable": hospital_reachable,
+                    "major_road_reachable": main_road_reachable,
+                    "alternative_routes_available": hospital_reachable or main_road_reachable,
                     "affected_edges": [list(edge) for edge in affected_edges],
                     "analysis_mode": analysis_mode,
                 }

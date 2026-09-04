@@ -39,6 +39,7 @@ const CATEGORIES: Array<{ key: HazardCategory; label: string; icon: string; desc
 export function HazardReportForm() {
   const { t, language } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
 
   // Form State
   const [step, setStep] = useState<number>(1);
@@ -57,6 +58,7 @@ export function HazardReportForm() {
   const [reporterType, setReporterType] = useState<ReporterType>('citizen');
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
+  const [mediaCapturedAt, setMediaCapturedAt] = useState<string | null>(null);
 
   // Submission State
   const [isLocating, setIsLocating] = useState(false);
@@ -105,8 +107,22 @@ export function HazardReportForm() {
     }
 
     setMediaFile(file);
+    setMediaCapturedAt(new Date().toISOString());
     const objectUrl = URL.createObjectURL(file);
     setMediaPreview(objectUrl);
+
+    // Attach a fresh device location to the report metadata at capture/select time.
+    // We do not rewrite EXIF bytes; the protected report record is the source of truth.
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setCoords({ latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy });
+          setLocationSource('device_gps');
+        },
+        () => undefined,
+        { enableHighAccuracy: true, timeout: 8000, maximumAge: 15000 }
+      );
+    }
   };
 
   // Submit Handler
@@ -124,7 +140,7 @@ export function HazardReportForm() {
       latitude: coords.latitude,
       longitude: coords.longitude,
       accuracy_m: coords.accuracy,
-      timestamp: new Date().toISOString(),
+      timestamp: mediaCapturedAt || new Date().toISOString(),
       category,
       description_original: description || `${t.categories[category]} reported at ${placeName}`,
       language: selectedLanguage,
@@ -208,6 +224,7 @@ export function HazardReportForm() {
     setRoadName('');
     setMediaFile(null);
     setMediaPreview(null);
+    setMediaCapturedAt(null);
     setSubmittedReportId(null);
     setSavedOffline(false);
     setErrorMessage(null);
@@ -502,6 +519,14 @@ export function HazardReportForm() {
             className="hidden"
             onChange={handleMediaChange}
           />
+          <input
+            ref={cameraInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            capture="environment"
+            className="hidden"
+            onChange={handleMediaChange}
+          />
 
           <div className="p-6 rounded-2xl border-2 border-dashed border-slate-700 bg-slate-950/40 text-center space-y-3">
             {mediaPreview ? (
@@ -514,11 +539,17 @@ export function HazardReportForm() {
                 <div className="text-xs text-slate-300 font-mono">
                   {mediaFile?.name} ({(mediaFile?.size || 0) / 1024 > 1024 ? `${((mediaFile?.size || 0) / (1024 * 1024)).toFixed(1)} MB` : `${((mediaFile?.size || 0) / 1024).toFixed(0)} KB`})
                 </div>
+                <div className="flex items-center justify-center gap-1.5 text-[11px] text-emerald-400">
+                  <MapPin className="w-3.5 h-3.5" />
+                  GPS attached to report · {coords.latitude.toFixed(5)}, {coords.longitude.toFixed(5)}
+                  {coords.accuracy !== null ? ` · ±${coords.accuracy.toFixed(0)}m` : ''}
+                </div>
                 <button
                   type="button"
                   onClick={() => {
                     setMediaFile(null);
                     setMediaPreview(null);
+                    setMediaCapturedAt(null);
                   }}
                   className="px-3 py-1 bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-lg text-xs hover:bg-rose-500/30"
                 >
@@ -546,6 +577,14 @@ export function HazardReportForm() {
                   >
                     <Upload className="w-4 h-4" />
                     <span>{t.report.chooseFile}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="py-2 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs flex items-center gap-1.5"
+                  >
+                    <Camera className="w-4 h-4" />
+                    <span>Take photo</span>
                   </button>
                 </div>
               </div>

@@ -33,6 +33,37 @@ async def upload_report_media(report_id: str, request: Request, file: UploadFile
     return _media_dict(item)
 
 
+@router.get("/map")
+def map_reports(
+    limit: int = Query(default=200, ge=1, le=500),
+    session: Session = Depends(get_db_session),
+) -> dict:
+    """Public map feed contains verified reports only; pending reporter data stays private."""
+    reports = ReportsRepository(session).list(limit=limit, verification_status="verified")
+    features = []
+    for report in reports:
+        features.append(
+            {
+                "type": "Feature",
+                "id": report.report_id,
+                "geometry": {"type": "Point", "coordinates": [report.longitude, report.latitude]},
+                "properties": {
+                    "report_id": report.report_id,
+                    "category": report.category,
+                    "severity": report.ai_severity or report.severity_observed or "unknown",
+                    "verification_status": report.verification_status,
+                    "captured_at": report.captured_at.isoformat(),
+                    "source": "verified_citizen_report",
+                },
+            }
+        )
+    return {
+        "type": "FeatureCollection",
+        "features": features,
+        "metadata": {"status": "available", "visibility": "verified_only", "returned_feature_count": len(features)},
+    }
+
+
 @router.get("/{report_id}/media", dependencies=[Depends(require_authority_key)])
 async def list_report_media(report_id: str, request: Request, session: Session = Depends(get_db_session)) -> dict:
     items = list(session.query(ReportMediaDB).filter(ReportMediaDB.report_id == report_id).order_by(ReportMediaDB.uploaded_at))

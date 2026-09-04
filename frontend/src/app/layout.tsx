@@ -1,6 +1,8 @@
 import type { Metadata, Viewport } from 'next';
 import './globals.css';
 import { LanguageProvider } from '@/lib/i18n/context';
+import { OfflineRuntime } from '@/components/offline/OfflineRuntime';
+import { DevDiagnosticsPanel } from '@/components/debug/DevDiagnosticsPanel';
 
 export const metadata: Metadata = {
   title: 'Bhu Rakshak — AI-Assisted Landslide Risk & Connectivity Intelligence',
@@ -17,7 +19,6 @@ export const metadata: Metadata = {
 export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
-  maximumScale: 1,
   themeColor: '#090d16',
 };
 
@@ -33,7 +34,9 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen bg-slate-950 text-slate-100 antialiased selection:bg-sky-500 selection:text-white">
         <LanguageProvider>
+          <OfflineRuntime />
           {children}
+          <DevDiagnosticsPanel />
         </LanguageProvider>
       </body>
     </html>

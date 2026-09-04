@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, Query, Request
-from shapely.geometry import box, mapping, shape
+from shapely.geometry import shape
 from sqlalchemy.orm import Session
 
 from ...dependencies import get_db_session
@@ -33,27 +33,17 @@ async def road_exposure(
     request: Request,
     bbox: str = Query(default="92.64,23.63,92.80,23.82"),
     resolution: int = Query(default=5, ge=2),
+    limit: int = Query(default=800, ge=1, le=5_000),
     session: Session = Depends(get_db_session),
 ) -> dict:
     services = request.app.state.services
     grid = await services.risk_grid.generate(session, bbox=bbox, resolution=resolution)
-    west, south, east, north = grid["metadata"]["bbox"]
-    half_lon = (east - west) / max(2, resolution - 1) / 2
-    half_lat = (north - south) / max(2, resolution - 1) / 2
-    risk_polygons = {"type": "FeatureCollection", "features": []}
-    for feature in grid["features"]:
-        longitude, latitude = feature["geometry"]["coordinates"]
-        risk_polygons["features"].append(
-            {
-                "type": "Feature",
-                "geometry": mapping(box(longitude - half_lon, latitude - half_lat, longitude + half_lon, latitude + half_lat)),
-                "properties": feature["properties"],
-            }
-        )
-    road_data = services.geo.intersecting_features(
+    risk_polygons = grid
+    road_data = services.geo.load_feature_collection(
         request.app.state.settings.roads_geojson_path,
-        [shape(feature["geometry"]) for feature in risk_polygons["features"]],
         layer="roads",
+        bbox=bbox,
+        limit=limit,
     )
     statuses = {row.road_id: {"status": row.status, "verified": row.verified, "source": row.source} for row in session.query(RoadStatusDB).all()}
     return services.road_exposure.analyze(road_data, risk_polygons, statuses)

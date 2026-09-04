@@ -42,10 +42,29 @@ export interface RiskPointResponse {
       historical_events_within_2km: number;
       inventory_size: number;
     };
+    historical?: {
+      historical_susceptibility_score: number;
+      nearest_historical_event_distance_m: number;
+      historical_events_within_500m: number;
+      historical_events_within_1km: number;
+      historical_events_within_2km: number;
+      inventory_size: number;
+      status: string;
+    };
     ml_susceptibility?: {
       ml_susceptibility_score?: number | null;
       model_name: string;
       status: string;
+    };
+    ml?: {
+      available: boolean;
+      model_loaded: boolean;
+      susceptibility_score?: number | null;
+      ml_susceptibility_score?: number | null;
+      model_name: string;
+      model_version: string;
+      status: string;
+      features?: string[];
     };
     sensor?: {
       status: string;
@@ -161,6 +180,9 @@ export interface RoadsResponse {
   features: RoadFeature[];
   metadata: {
     count: number;
+    total_feature_count?: number;
+    matched_feature_count?: number;
+    returned_feature_count?: number;
     offset: number;
     limit: number;
     layer: string;
@@ -225,6 +247,14 @@ export interface VillageIsolationResponse {
 export interface FacilityAccessibilityResponse {
   accessibility_status: string;
   source_node?: string;
+  nearest_facility?: {
+    facility_id: string;
+    name: string;
+    facility_type: string;
+  } | null;
+  route_distance_m?: number;
+  estimated_travel_time_seconds?: number;
+  route_risk_exposure?: number;
   reachable_facilities: Array<{
     facility_id: string;
     name: string;
@@ -238,6 +268,17 @@ export interface FacilityAccessibilityResponse {
     name: string;
     facility_type: string;
   }>;
+}
+
+export interface PlaceSearchItem {
+  id: string;
+  name: string;
+  type: 'facility' | 'settlement' | 'road';
+  subtype?: string | null;
+  latitude: number;
+  longitude: number;
+  display_name: string;
+  source: string;
 }
 
 export interface RouteSegment {

@@ -158,7 +158,15 @@ class RiskOrchestrator:
             )
         else:
             ml_result = self.ml.predict({})
-        signal_data["ml"] = ml_result.model_dump(mode="json")
+        signal_data["ml"] = {
+            **ml_result.model_dump(mode="json"),
+            "available": ml_result.status == "available",
+            "model_loaded": self.ml.model is not None,
+            "susceptibility_score": ml_result.ml_susceptibility_score,
+            "features": self.ml.expected_features,
+        }
+        signal_data["ml_susceptibility"] = signal_data["ml"]
+        signal_data["historical_susceptibility"] = signal_data["historical"]
         signal_data["rainfall"]["provider_status"] = weather_status
 
         evaluated = self.hybrid.evaluate_scores(signal_data)

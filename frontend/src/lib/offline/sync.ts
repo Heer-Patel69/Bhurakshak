@@ -1,5 +1,5 @@
 import { api } from '../api';
-import { getPendingReports, updateQueuedReport } from './db';
+import { deleteQueuedReport, getPendingReports, updateQueuedReport } from './db';
 import type { OfflineQueuedReport } from '../types';
 
 export type SyncCallback = (status: {
@@ -68,15 +68,11 @@ export async function syncOfflineReports(): Promise<{ synced: number; failed: nu
               { type: item.media_mime || 'image/jpeg' }
             );
 
-          try {
-            await api.uploadReportMedia(serverReport.report_id, fileToUpload);
-          } catch (mediaErr) {
-            console.warn('Media upload error after report creation:', mediaErr);
-          }
+          await api.uploadReportMedia(serverReport.report_id, fileToUpload);
         }
 
         item.status = 'synced';
-        await updateQueuedReport(item);
+        await deleteQueuedReport(item.local_id);
         synced++;
       } catch (err: any) {
         failed++;

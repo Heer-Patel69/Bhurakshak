@@ -1,42 +1,169 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from '@/lib/i18n/context';
 import { api } from '@/lib/api';
-import type { RouteCompareResponse, SettlementFeature, FacilityFeature, RouteSegment } from '@/lib/types';
-import { Route, Navigation, ShieldCheck, Clock, AlertTriangle, ArrowRight, CheckCircle2, RotateCcw, Locate } from 'lucide-react';
+import type { RouteCompareResponse, RouteSegment, PlaceSearchItem } from '@/lib/types';
+import {
+  Route,
+  Navigation,
+  ShieldCheck,
+  Clock,
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  RotateCcw,
+  Locate,
+  MapPin,
+  Search,
+  Building2,
+  MapPinned,
+  Crosshair,
+} from 'lucide-react';
+
+interface RoutePoint {
+  latitude: number;
+  longitude: number;
+  label: string;
+}
 
 interface RoutePlannerProps {
   onRouteCalculated?: (routes: { fastest: RouteSegment; safer: RouteSegment } | null) => void;
+  onPointsSelected?: (points: {
+    origin: RoutePoint | null;
+    destination: RoutePoint | null;
+  }) => void;
+  pickedCoordinates?: { latitude: number; longitude: number } | null;
 }
 
-export function RoutePlanner({ onRouteCalculated }: RoutePlannerProps) {
+export function RoutePlanner({
+  onRouteCalculated,
+  onPointsSelected,
+  pickedCoordinates,
+}: RoutePlannerProps) {
   const { t } = useTranslation();
-  const [settlements, setSettlements] = useState<SettlementFeature[]>([]);
-  const [facilities, setFacilities] = useState<FacilityFeature[]>([]);
 
-  // Origin / Destination
-  const [origin, setOrigin] = useState<{ latitude: number; longitude: number; label: string }>({
-    latitude: 23.7271,
-    longitude: 92.7176,
-    label: 'Aizawl Center',
+  // Origin / Destination states
+  const [origin, setOrigin] = useState<RoutePoint>({
+    latitude: 23.7319548,
+    longitude: 92.7166098,
+    label: 'Aizawl Civil Hospital',
   });
-  const [destination, setDestination] = useState<{ latitude: number; longitude: number; label: string }>({
-    latitude: 23.7500,
-    longitude: 92.7300,
-    label: 'Civil Hospital / North Aizawl',
+  const [destination, setDestination] = useState<RoutePoint>({
+    latitude: 23.7357935,
+    longitude: 92.6645375,
+    label: 'Mizoram University',
   });
+
+  // Autocomplete search states
+  const [originQuery, setOriginQuery] = useState('Aizawl Civil Hospital');
+  const [destQuery, setDestQuery] = useState('Mizoram University');
+  const [originSuggestions, setOriginSuggestions] = useState<PlaceSearchItem[]>([]);
+  const [destSuggestions, setDestSuggestions] = useState<PlaceSearchItem[]>([]);
+  const [loadingOriginSearch, setLoadingOriginSearch] = useState(false);
+  const [loadingDestSearch, setLoadingDestSearch] = useState(false);
+  const [showOriginDropdown, setShowOriginDropdown] = useState(false);
+  const [showDestDropdown, setShowDestDropdown] = useState(false);
+
+  // Pin picking mode
+  const [pickingTarget, setPickingTarget] = useState<'origin' | 'destination' | null>(null);
 
   const [loading, setLoading] = useState(false);
   const [routeResult, setRouteResult] = useState<RouteCompareResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // Debounced search for Origin
   useEffect(() => {
-    api.getSettlements().then((res) => setSettlements(res.features || [])).catch(() => {});
-    api.getFacilities().then((res) => setFacilities(res.features || [])).catch(() => {});
-  }, []);
+    if (!originQuery || originQuery.length < 2) {
+      setOriginSuggestions([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setLoadingOriginSearch(true);
+      try {
+        const res = await api.searchPlaces(originQuery, 8);
+        setOriginSuggestions(res.items || []);
+      } catch {
+        setOriginSuggestions([]);
+      } finally {
+        setLoadingOriginSearch(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [originQuery]);
+
+  // Debounced search for Destination
+  useEffect(() => {
+    if (!destQuery || destQuery.length < 2) {
+      setDestSuggestions([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setLoadingDestSearch(true);
+      try {
+        const res = await api.searchPlaces(destQuery, 8);
+        setDestSuggestions(res.items || []);
+      } catch {
+        setDestSuggestions([]);
+      } finally {
+        setLoadingDestSearch(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [destQuery]);
+
+  // Notify parent of point changes
+  useEffect(() => {
+    if (onPointsSelected) {
+      onPointsSelected({ origin, destination });
+    }
+  }, [origin, destination, onPointsSelected]);
+
+  // Handle picked coordinates from map
+  useEffect(() => {
+    if (pickedCoordinates && pickingTarget) {
+      const point: RoutePoint = {
+        latitude: pickedCoordinates.latitude,
+        longitude: pickedCoordinates.longitude,
+        label: `Pinned (${pickedCoordinates.latitude.toFixed(4)}, ${pickedCoordinates.longitude.toFixed(4)})`,
+      };
+      if (pickingTarget === 'origin') {
+        setOrigin(point);
+        setOriginQuery(point.label);
+      } else {
+        setDestination(point);
+        setDestQuery(point.label);
+      }
+      setPickingTarget(null);
+    }
+  }, [pickedCoordinates, pickingTarget]);
+
+  const handleSelectOrigin = (item: PlaceSearchItem) => {
+    setOrigin({
+      latitude: item.latitude,
+      longitude: item.longitude,
+      label: item.name,
+    });
+    setOriginQuery(item.name);
+    setShowOriginDropdown(false);
+  };
+
+  const handleSelectDestination = (item: PlaceSearchItem) => {
+    setDestination({
+      latitude: item.latitude,
+      longitude: item.longitude,
+      label: item.name,
+    });
+    setDestQuery(item.name);
+    setShowDestDropdown(false);
+  };
 
   const handleCompareRoutes = async () => {
+    if (!origin || !destination) {
+      setError('Please select both Origin and Destination places.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
     try {
@@ -61,14 +188,25 @@ export function RoutePlanner({ onRouteCalculated }: RoutePlannerProps) {
   };
 
   const handleUseCurrentLocationForOrigin = () => {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition((pos) => {
-      setOrigin({
-        latitude: pos.coords.latitude,
-        longitude: pos.coords.longitude,
-        label: 'My Current Location',
-      });
-    });
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser.');
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const p: RoutePoint = {
+          latitude: pos.coords.latitude,
+          longitude: pos.coords.longitude,
+          label: 'My Current Location (GPS)',
+        };
+        setOrigin(p);
+        setOriginQuery(p.label);
+      },
+      () => {
+        alert('Could not retrieve device GPS location.');
+      },
+      { enableHighAccuracy: true, timeout: 10000 }
+    );
   };
 
   return (
@@ -86,115 +224,155 @@ export function RoutePlanner({ onRouteCalculated }: RoutePlannerProps) {
         </div>
       </div>
 
-      {/* Input Controls */}
-      <div className="space-y-3 text-xs">
-        {/* Origin */}
-        <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
+      {/* Picking on map indicator */}
+      {pickingTarget && (
+        <div className="p-2.5 bg-amber-500/10 border border-amber-500/30 rounded-xl text-amber-300 text-xs flex items-center justify-between">
+          <span className="flex items-center gap-2">
+            <Crosshair className="w-4 h-4 animate-spin text-amber-400" />
+            Click anywhere on the map to set {pickingTarget === 'origin' ? 'Origin' : 'Destination'}
+          </span>
+          <button
+            type="button"
+            onClick={() => setPickingTarget(null)}
+            className="text-[11px] underline hover:text-white"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {/* Autocomplete Input Controls */}
+      <div className="space-y-4 text-xs">
+        {/* FROM PLACE */}
+        <div className="relative p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
           <div className="flex items-center justify-between">
             <label className="font-semibold text-slate-300 flex items-center gap-1.5">
               <span className="w-2.5 h-2.5 rounded-full bg-sky-400" />
-              <span>{t.routing.origin}</span>
+              <span>FROM (Origin)</span>
             </label>
-            <button
-              type="button"
-              onClick={handleUseCurrentLocationForOrigin}
-              className="text-sky-400 hover:text-sky-300 text-[11px] flex items-center gap-1"
-            >
-              <Locate className="w-3 h-3" />
-              <span>{t.routing.useCurrentLocation}</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleUseCurrentLocationForOrigin}
+                className="text-sky-400 hover:text-sky-300 text-[11px] flex items-center gap-1"
+                title="Use Current Device Location"
+              >
+                <Locate className="w-3 h-3" />
+                <span>My Location</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setPickingTarget('origin')}
+                className={`text-[11px] flex items-center gap-1 px-1.5 py-0.5 rounded border transition-colors ${
+                  pickingTarget === 'origin'
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                    : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+                }`}
+                title="Pick location on map"
+              >
+                <MapPin className="w-3 h-3 text-sky-400" />
+                <span>Pick on Map</span>
+              </button>
+            </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
             <input
-              type="number"
-              step="0.001"
-              value={origin.latitude}
-              onChange={(e) => setOrigin({ ...origin, latitude: parseFloat(e.target.value) || 23.7271 })}
-              placeholder="Origin Latitude"
-              className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200"
-            />
-            <input
-              type="number"
-              step="0.001"
-              value={origin.longitude}
-              onChange={(e) => setOrigin({ ...origin, longitude: parseFloat(e.target.value) || 92.7176 })}
-              placeholder="Origin Longitude"
-              className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200"
-            />
-          </div>
-
-          {settlements.length > 0 && (
-            <select
+              type="text"
+              value={originQuery}
               onChange={(e) => {
-                const s = settlements.find((item) => (item.properties.village_id || item.id) === e.target.value);
-                if (s) {
-                  setOrigin({
-                    latitude: s.geometry.coordinates[1],
-                    longitude: s.geometry.coordinates[0],
-                    label: s.properties.name,
-                  });
-                }
+                setOriginQuery(e.target.value);
+                setShowOriginDropdown(true);
               }}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-[11px] text-slate-300"
-            >
-              <option value="">-- Or Select Origin Village / Settlement --</option>
-              {settlements.map((s) => (
-                <option key={s.properties.village_id || s.id} value={s.properties.village_id || s.id}>
-                  {s.properties.name}
-                </option>
+              onFocus={() => setShowOriginDropdown(true)}
+              placeholder="Search place, hospital, village (e.g. Aizawl Civil Hospital)"
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500"
+            />
+            {loadingOriginSearch && (
+              <span className="absolute right-3 top-2.5 text-[10px] text-slate-400">Searching...</span>
+            )}
+          </div>
+
+          {/* Origin Suggestions Dropdown */}
+          {showOriginDropdown && originSuggestions.length > 0 && (
+            <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl max-h-48 overflow-y-auto divide-y divide-slate-800">
+              {originSuggestions.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => handleSelectOrigin(item)}
+                  className="w-full text-left px-3 py-2 hover:bg-slate-800/80 transition-colors flex items-center gap-2"
+                >
+                  <Building2 className="w-3.5 h-3.5 text-sky-400 flex-shrink-0" />
+                  <div className="truncate">
+                    <div className="font-semibold text-slate-200 text-xs">{item.name}</div>
+                    <div className="text-[10px] text-slate-400 truncate">{item.display_name}</div>
+                  </div>
+                </button>
               ))}
-            </select>
+            </div>
           )}
         </div>
 
-        {/* Destination */}
-        <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
-          <label className="font-semibold text-slate-300 flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
-            <span>{t.routing.destination}</span>
-          </label>
-
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              type="number"
-              step="0.001"
-              value={destination.latitude}
-              onChange={(e) => setDestination({ ...destination, latitude: parseFloat(e.target.value) || 23.75 })}
-              placeholder="Dest Latitude"
-              className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200"
-            />
-            <input
-              type="number"
-              step="0.001"
-              value={destination.longitude}
-              onChange={(e) => setDestination({ ...destination, longitude: parseFloat(e.target.value) || 92.73 })}
-              placeholder="Dest Longitude"
-              className="bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 font-mono text-slate-200"
-            />
+        {/* TO DESTINATION */}
+        <div className="relative p-3 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
+          <div className="flex items-center justify-between">
+            <label className="font-semibold text-slate-300 flex items-center gap-1.5">
+              <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />
+              <span>TO (Destination)</span>
+            </label>
+            <button
+              type="button"
+              onClick={() => setPickingTarget('destination')}
+              className={`text-[11px] flex items-center gap-1 px-1.5 py-0.5 rounded border transition-colors ${
+                pickingTarget === 'destination'
+                  ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                  : 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700'
+              }`}
+              title="Pick destination on map"
+            >
+              <MapPinned className="w-3 h-3 text-emerald-400" />
+              <span>Pick on Map</span>
+            </button>
           </div>
 
-          {facilities.length > 0 && (
-            <select
+          <div className="relative">
+            <Search className="w-3.5 h-3.5 text-slate-500 absolute left-3 top-2.5" />
+            <input
+              type="text"
+              value={destQuery}
               onChange={(e) => {
-                const f = facilities.find((item) => (item.properties.facility_id || item.id) === e.target.value);
-                if (f) {
-                  setDestination({
-                    latitude: f.geometry.coordinates[1],
-                    longitude: f.geometry.coordinates[0],
-                    label: f.properties.name,
-                  });
-                }
+                setDestQuery(e.target.value);
+                setShowDestDropdown(true);
               }}
-              className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1 text-[11px] text-slate-300"
-            >
-              <option value="">-- Or Select Hospital / Emergency Facility --</option>
-              {facilities.map((f) => (
-                <option key={f.properties.facility_id || f.id} value={f.properties.facility_id || f.id}>
-                  🏥 {f.properties.name} ({f.properties.facility_type})
-                </option>
+              onFocus={() => setShowDestDropdown(true)}
+              placeholder="Search destination, university, clinic (e.g. Mizoram University)"
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg pl-9 pr-3 py-2 text-xs text-slate-100 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+            {loadingDestSearch && (
+              <span className="absolute right-3 top-2.5 text-[10px] text-slate-400">Searching...</span>
+            )}
+          </div>
+
+          {/* Destination Suggestions Dropdown */}
+          {showDestDropdown && destSuggestions.length > 0 && (
+            <div className="absolute left-0 right-0 top-full mt-1 z-30 bg-slate-900 border border-slate-700 rounded-xl shadow-2xl max-h-48 overflow-y-auto divide-y divide-slate-800">
+              {destSuggestions.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => handleSelectDestination(item)}
+                  className="w-full text-left px-3 py-2 hover:bg-slate-800/80 transition-colors flex items-center gap-2"
+                >
+                  <MapPin className="w-3.5 h-3.5 text-emerald-400 flex-shrink-0" />
+                  <div className="truncate">
+                    <div className="font-semibold text-slate-200 text-xs">{item.name}</div>
+                    <div className="text-[10px] text-slate-400 truncate">{item.display_name}</div>
+                  </div>
+                </button>
               ))}
-            </select>
+            </div>
           )}
         </div>
 
@@ -202,25 +380,29 @@ export function RoutePlanner({ onRouteCalculated }: RoutePlannerProps) {
         <button
           onClick={handleCompareRoutes}
           disabled={loading}
-          className="w-full py-3 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-sky-600/20 transition-all"
+          className="w-full py-3 bg-gradient-to-r from-sky-600 to-indigo-600 hover:from-sky-500 hover:to-indigo-500 disabled:from-slate-800 disabled:to-slate-800 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-sky-600/20 transition-all"
         >
           {loading ? (
             <>
               <RotateCcw className="w-4 h-4 animate-spin" />
-              <span>Analyzing Network Graph...</span>
+              <span>Calculating Route Options...</span>
             </>
           ) : (
             <>
               <Navigation className="w-4 h-4" />
-              <span>{t.routing.compareButton}</span>
+              <span>Find Safest & Fastest Routes</span>
             </>
           )}
         </button>
       </div>
 
       {error && (
-        <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs">
-          {error}
+        <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
+          <div>
+            <div className="font-bold">Route Calculation Failed</div>
+            <div className="text-[11px] text-rose-200/80 mt-0.5">{error}</div>
+          </div>
         </div>
       )}
 
@@ -230,7 +412,7 @@ export function RoutePlanner({ onRouteCalculated }: RoutePlannerProps) {
           {/* Summary Metric Badges */}
           <div className="grid grid-cols-2 gap-3">
             {/* Fastest Route Card */}
-            <div className="p-3.5 rounded-xl bg-slate-950 border border-sky-500/30 space-y-2">
+            <div className="p-3.5 rounded-xl bg-slate-950 border border-sky-500/40 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="font-bold text-sky-400 text-xs flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-full bg-sky-500" />
@@ -304,7 +486,8 @@ export function RoutePlanner({ onRouteCalculated }: RoutePlannerProps) {
                 <span>{routeResult.comparison.risk_reduction_percent.toFixed(1)}% Risk Exposure Reduction</span>
               </div>
               <p className="text-[11px] text-slate-300">
-                {routeResult.comparison.advisory || `Safer path avoids high hazard segments with only +${routeResult.comparison.extra_travel_time_minutes.toFixed(1)} mins travel time.`}
+                {routeResult.comparison.advisory ||
+                  `Safer path avoids high hazard segments with +${routeResult.comparison.extra_travel_time_minutes.toFixed(1)} mins travel time.`}
               </p>
             </div>
           ) : (

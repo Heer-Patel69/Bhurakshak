@@ -2,23 +2,32 @@
 
 import React, { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
-import { Radio, CheckCircle2, XCircle, AlertCircle, Database, Satellite, Cpu, CloudRain, Sparkles } from 'lucide-react';
+import { CheckCircle2, XCircle } from 'lucide-react';
 
 interface ProviderHealthProps {
   authorityKey: string;
 }
 
-export function ProviderHealth({ authorityKey }: ProviderHealthProps) {
-  const [overview, setOverview] = useState<any>(null);
+export function ProviderHealth({ authorityKey: _authorityKey }: ProviderHealthProps) {
+  const [providers, setProviders] = useState<any>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     setLoading(true);
-    api.getAuthorityOverview(authorityKey)
-      .then((res) => setOverview(res))
+    api.getProviders()
+      .then((res) => setProviders(res))
       .catch((err) => console.warn('Provider health error:', err))
       .finally(() => setLoading(false));
-  }, [authorityKey]);
+  }, [_authorityKey]);
+
+  const available = (status: unknown) => status === 'available' || status === 'operational';
+  const StatusIcon = ({ status }: { status: unknown }) =>
+    available(status) ? <CheckCircle2 className="w-4 h-4 text-emerald-400" /> : <XCircle className="w-4 h-4 text-slate-500" />;
+  const StatusBadge = ({ status }: { status: unknown }) => (
+    <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${available(status) ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-slate-800 text-slate-400 border-slate-700'}`}>
+      {String(status || 'unknown').replaceAll('_', ' ')}
+    </span>
+  );
 
   return (
     <div className="space-y-4 text-xs">
@@ -37,84 +46,72 @@ export function ProviderHealth({ authorityKey }: ProviderHealthProps) {
           <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
             <div className="flex items-center justify-between">
               <span className="font-bold text-slate-200">Copernicus DEM (Terrain)</span>
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <StatusIcon status={providers?.terrain?.status} />
             </div>
             <p className="text-slate-400 text-[11px]">
-              Local slope, elevation, and terrain features loaded from verified dataset.
+              {providers?.terrain?.source || 'Terrain provider status unavailable.'}
             </p>
-            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-              Operational (Static)
-            </span>
+            <StatusBadge status={providers?.terrain?.status} />
           </div>
 
           {/* GSI Landslides */}
           <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
             <div className="flex items-center justify-between">
               <span className="font-bold text-slate-200">GSI Landslide Inventory</span>
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <StatusIcon status={providers?.historical?.status} />
             </div>
             <p className="text-slate-400 text-[11px]">
-              572 verified historical events with spatial kernel susceptibility.
+              Historical inventory and spatial susceptibility status from the backend.
             </p>
-            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-              572 Events Loaded
-            </span>
+            <StatusBadge status={providers?.historical?.status} /> <span className="text-[10px] text-slate-400 ml-2">{providers?.historical?.inventory_size ?? 'unknown'} events</span>
           </div>
 
           {/* XGBoost Susceptibility */}
           <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
             <div className="flex items-center justify-between">
               <span className="font-bold text-slate-200">XGBoost ML Engine</span>
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <StatusIcon status={providers?.ml?.status} />
             </div>
             <p className="text-slate-400 text-[11px]">
-              Experimental storm-conditioned spatial susceptibility model.
+              {providers?.ml?.model_name || 'No model metadata returned.'}
             </p>
-            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-              Loaded & Validated
-            </span>
+            <StatusBadge status={providers?.ml?.model_loaded ? 'available' : 'unavailable'} /> <span className="text-[10px] text-slate-400 ml-2">v{providers?.ml?.model_version || 'unknown'}</span>
           </div>
 
           {/* CHIRPS Historical */}
           <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
             <div className="flex items-center justify-between">
               <span className="font-bold text-slate-200">CHIRPS Rainfall Data</span>
-              <CheckCircle2 className="w-4 h-4 text-amber-400" />
+              <StatusIcon status={providers?.weather?.chirps?.status} />
             </div>
             <p className="text-slate-400 text-[11px]">
-              Historical monsoon rainfall records (May–Sep 2024/2025).
+              {providers?.weather?.chirps?.message || 'Historical rainfall provider status unavailable.'}
             </p>
-            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
-              Historical Reference
-            </span>
+            <StatusBadge status={providers?.weather?.chirps?.status} />
           </div>
 
           {/* IMD Weather */}
           <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
             <div className="flex items-center justify-between">
               <span className="font-bold text-slate-200">IMD Live Weather Station</span>
-              <XCircle className="w-4 h-4 text-slate-500" />
+              <StatusIcon status={providers?.weather?.imd?.status} />
             </div>
             <p className="text-slate-400 text-[11px]">
-              Live station REST adapter is configured and ready for IMD API key.
+              {providers?.weather?.imd?.message || 'IMD provider status unavailable.'}
             </p>
-            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">
-              Awaiting Credential
-            </span>
+            <StatusBadge status={providers?.weather?.imd?.status} />
           </div>
 
           {/* Groq Copilot */}
           <div className="p-4 rounded-xl bg-slate-950/70 border border-slate-800 space-y-2">
             <div className="flex items-center justify-between">
               <span className="font-bold text-slate-200">Groq LLM Safety Copilot</span>
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              <StatusIcon status={providers?.copilot?.status} />
             </div>
             <p className="text-slate-400 text-[11px]">
-              Grounded AI safety advice with multilingual deterministic fallback.
+              {providers?.copilot?.role || 'Grounded explanation provider status unavailable.'}
             </p>
-            <span className="inline-block px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-              Operational
-            </span>
+            <StatusBadge status={providers?.copilot?.status} />
           </div>
         </div>
       )}

@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslation, LanguageCode } from '@/lib/i18n/context';
-import { Shield, Map, AlertTriangle, Route, Bell, Radio, WifiOff, CloudRain, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Shield, ShieldAlert, Map, AlertTriangle, Route, Bell, Radio, WifiOff, CloudRain, Sparkles, CheckCircle2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import type { BootstrapResponse } from '@/lib/types';
 import { subscribeSyncStatus, syncOfflineReports } from '@/lib/offline/sync';
@@ -45,6 +45,12 @@ export function Header({ onOpenWeather, onOpenCopilot, onOpenTelemetry }: Header
   }, []);
 
   const riskContext = bootstrap?.risk_context || 'historical_reference_scenario';
+  const mapNavTitle =
+    riskContext === 'live_operational'
+      ? 'Live Risk Map'
+      : riskContext === 'degraded_current'
+      ? 'Current Risk — Limited Data'
+      : 'Historical Risk Explorer';
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-800 bg-slate-950/90 backdrop-blur-md">
@@ -70,23 +76,23 @@ export function Header({ onOpenWeather, onOpenCopilot, onOpenTelemetry }: Header
       )}
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
-        {/* Logo & Product Identity */}
+        {/* Logo & Pilot Title */}
         <div className="flex items-center gap-3">
           <Link href="/" className="flex items-center gap-2.5 group">
-            <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-sky-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-sky-500/20 group-hover:scale-105 transition-transform">
-              <Shield className="w-5 h-5" />
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 to-indigo-600 flex items-center justify-center text-white shadow-lg shadow-sky-500/20 group-hover:scale-105 transition-transform">
+              <ShieldAlert className="w-6 h-6" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <span className="font-black text-lg tracking-wider text-white font-mono">
-                  {t.app.title}
+              <div className="flex items-center gap-1.5">
+                <span className="font-black text-lg tracking-tight text-white">
+                  Bhu Rakshak
                 </span>
-                <span className="text-[10px] uppercase font-bold tracking-widest px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20">
-                  {t.app.pilot}
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-400 font-bold border border-sky-500/30">
+                  AIZAWL PILOT
                 </span>
               </div>
-              <p className="text-[11px] text-slate-400 hidden sm:block truncate max-w-sm">
-                {t.app.subtitle}
+              <p className="text-[10px] text-slate-400 -mt-0.5">
+                Landslide Early Warning & Risk Intelligence
               </p>
             </div>
           </Link>
@@ -121,7 +127,7 @@ export function Header({ onOpenWeather, onOpenCopilot, onOpenTelemetry }: Header
             }`}
           >
             <Map className="w-4 h-4" />
-            {t.nav.map}
+            {mapNavTitle}
           </Link>
           <Link
             href="/report"
