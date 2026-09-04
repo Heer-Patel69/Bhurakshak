@@ -75,7 +75,8 @@ class SensorService:
             "observation_time": ensure_utc(nearest.observed_at).isoformat(),
             "data_age_seconds": age,
             "distance_m": round(nearest_distance, 1),
-            "live": False,
+            "live": age <= 3600,
+            "data_age_seconds": round(age, 1),
         }
 
     @staticmethod

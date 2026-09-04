@@ -24,7 +24,17 @@ def ingest_sensor(
     return request.app.state.services.sensors.serialize(reading)
 
 
+@router.post("/readings", dependencies=[Depends(require_sensor_secret)], status_code=status.HTTP_201_CREATED)
+def ingest_sensor_reading(
+    payload: SensorReadingCreate,
+    request: Request,
+    session: Session = Depends(get_db_session),
+) -> dict:
+    """ESP32-compatible alias for the protected sensor-ingest endpoint."""
+    reading = request.app.state.services.sensors.ingest(session, payload)
+    return request.app.state.services.sensors.serialize(reading)
+
+
 @router.get("/status")
 def sensor_status(request: Request, session: Session = Depends(get_db_session)) -> dict:
     return request.app.state.services.sensors.status(session)
-
