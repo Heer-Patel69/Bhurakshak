@@ -76,6 +76,7 @@ class Settings(BaseSettings):
     facilities_geojson_path: Path | None = REPOSITORY_ROOT / "data" / "gis" / "processed" / "aizawl_facilities.geojson"
     road_graph_path: Path | None = REPOSITORY_ROOT / "data" / "gis" / "processed" / "aizawl_road_graph.joblib"
     routing_config_path: Path = BACKEND_ROOT / "config" / "routing.yaml"
+    routing_graph_enabled: bool = True
     aizawl_gis_bbox: str = "92.60,23.60,92.85,23.85"
 
     historical_bandwidth_m: float = Field(default=1_000.0, gt=0)

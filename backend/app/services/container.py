@@ -74,7 +74,10 @@ class ServiceContainer:
             roads_path=settings.roads_geojson_path,
         )
         self.road_exposure = RoadExposureService()
-        self.routing = RoutingService(settings.road_graph_path, config_path=settings.routing_config_path)
+        self.routing = RoutingService(
+            settings.road_graph_path if settings.routing_graph_enabled else None,
+            config_path=settings.routing_config_path,
+        )
         self.isolation = IsolationService()
         self.facility_access = FacilityAccessService(self.routing)
         self.alerts = AlertService(
