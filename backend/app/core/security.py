@@ -77,15 +77,4 @@ async def require_authority_key(request: Request) -> None:
         }
         return
 
-    configured = settings.authority_api_key
-    development_fallback = settings.app_env.casefold() in {"development", "dev", "test", "local"}
-    if not development_fallback or not configured:
-        raise TerraWatchError(
-            "AUTHORITY_AUTH_NOT_CONFIGURED",
-            "Supabase Auth is required. A server-side authority key is permitted only as a configured development fallback.",
-            status_code=503,
-        )
-    supplied = request.headers.get("X-Authority-Key")
-    if not supplied or not secrets.compare_digest(supplied, configured):
-        raise TerraWatchError("INVALID_AUTHORITY_CREDENTIALS", "Invalid authority credentials.", status_code=401)
-    request.state.authority = {"roles": ["authority"], "auth_mode": "development_key"}
+    raise TerraWatchError("AUTHORITY_AUTH_NOT_CONFIGURED", "Supabase Auth is required for authority access.", status_code=503)
