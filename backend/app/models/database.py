@@ -220,6 +220,11 @@ class AuthorityActionDB(Base):
 
 class Database:
     def __init__(self, url: str) -> None:
+        # SQLAlchemy otherwise selects the legacy psycopg2 dialect for a plain
+        # ``postgresql://`` URL. This project installs Psycopg 3, so normalize
+        # provider connection strings (including Supabase) to that dialect.
+        if url.startswith("postgresql://"):
+            url = "postgresql+psycopg://" + url.removeprefix("postgresql://")
         kwargs: dict[str, Any] = {"pool_pre_ping": True}
         if url.startswith("sqlite"):
             kwargs["connect_args"] = {"check_same_thread": False}
