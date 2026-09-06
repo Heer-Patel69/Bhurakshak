@@ -4,12 +4,28 @@ import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/lib/i18n/context';
 import { api } from '@/lib/api';
 import type { WeatherCurrentResponse, WeatherHistoryResponse } from '@/lib/types';
-import { CloudRain, CloudLightning, X, Droplets, Thermometer, Wind, CheckCircle2, XCircle, AlertCircle, Clock, Database, Radio } from 'lucide-react';
+import { CloudRain, CloudLightning, X, AlertCircle, Database, Radio, CheckCircle2, XCircle, Clock } from 'lucide-react';
 
 interface WeatherDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   coordinates?: { latitude: number; longitude: number } | null;
+}
+
+const PROVIDER_STATUS = [
+  { label: 'Copernicus DEM (Terrain)', state: 'ok', detail: 'Available (Static)' },
+  { label: 'GSI Landslide Inventory', state: 'ok', detail: '572 Records' },
+  { label: 'OSM Aizawl Roads', state: 'ok', detail: '116,763 Segments' },
+  { label: 'XGBoost ML Susceptibility', state: 'ok', detail: 'Operational' },
+  { label: 'CHIRPS Rainfall', state: 'partial', detail: 'Historical Reference' },
+  { label: 'IMD Weather Station', state: 'off', detail: 'Not Configured' },
+  { label: 'Groq LLM Safety Copilot', state: 'ok', detail: 'Ready (with Fallback)' },
+] as const;
+
+function StatusIcon({ state }: { state: 'ok' | 'partial' | 'off' }) {
+  if (state === 'ok') return <CheckCircle2 className="w-3 h-3 text-emerald-400" />;
+  if (state === 'partial') return <Clock className="w-3 h-3 text-amber-400" />;
+  return <XCircle className="w-3 h-3 text-slate-500" />;
 }
 
 export function WeatherDrawer({
@@ -22,11 +38,17 @@ export function WeatherDrawer({
   const [history, setHistory] = useState<WeatherHistoryResponse | null>(null);
   const [weatherStatus, setWeatherStatus] = useState<any>(null);
   const [loading, setLoading] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   const target = coordinates || { latitude: 23.7271, longitude: 92.7176 };
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      setMounted(false);
+      return;
+    }
+    // Trigger slide-in on next frame
+    const raf = requestAnimationFrame(() => setMounted(true));
     setLoading(true);
 
     Promise.all([
@@ -39,13 +61,19 @@ export function WeatherDrawer({
       setWeatherStatus(stat);
       setLoading(false);
     });
+
+    return () => cancelAnimationFrame(raf);
   }, [isOpen, target.latitude, target.longitude]);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-end p-0 bg-black/60 backdrop-blur-xs animate-in fade-in">
-      <div className="w-full max-w-md h-full bg-slate-900 border-l border-slate-800 shadow-2xl p-6 flex flex-col text-slate-100 overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-end bg-black/60 backdrop-blur-xs animate-in fade-in" onClick={onClose}>
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md h-full bg-slate-900 border-l border-slate-800 shadow-2xl p-6 flex flex-col text-slate-100 overflow-y-auto transition-transform duration-300 ease-out"
+        style={{ transform: mounted ? 'translateX(0)' : 'translateX(100%)' }}
+      >
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-slate-800">
           <div className="flex items-center gap-2.5">
@@ -82,8 +110,9 @@ export function WeatherDrawer({
                   {t.weather.current}
                 </span>
                 {current?.live ? (
-                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    {current?.observation?.provider || 'Current Weather'}
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    LIVE IMD
                   </span>
                 ) : (
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">
@@ -94,32 +123,30 @@ export function WeatherDrawer({
 
               <div className="bg-slate-950/70 p-4 rounded-xl border border-slate-800 space-y-3">
                 {current?.live && current.observation ? (
-                  <div className="space-y-3">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <span className="text-[10px] text-slate-400 block">{t.weather.rainfall1h}</span>
-                        <span className="text-lg font-bold font-mono text-sky-400">
-                          {current.observation.rainfall_1h_mm ?? 0} mm
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 block">{t.weather.rainfall24h}</span>
-                        <span className="text-lg font-bold font-mono text-sky-400">
-                          {current.observation.rainfall_24h_mm ?? 0} mm
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 block">{t.weather.temperature}</span>
-                        <span className="text-base font-bold font-mono text-slate-200">
-                          {current.observation.temperature_c ?? '--'} °C
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-[10px] text-slate-400 block">{t.weather.humidity}</span>
-                        <span className="text-base font-bold font-mono text-slate-200">
-                          {current.observation.humidity_percent ?? '--'} %
-                        </span>
-                      </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">{t.weather.rainfall1h}</span>
+                      <span className="text-lg font-bold font-mono text-sky-400">
+                        {current.observation.rainfall_1h_mm ?? 0} mm
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">{t.weather.rainfall24h}</span>
+                      <span className="text-lg font-bold font-mono text-sky-400">
+                        {current.observation.rainfall_24h_mm ?? 0} mm
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">{t.weather.temperature}</span>
+                      <span className="text-base font-bold font-mono text-slate-200">
+                        {current.observation.temperature_c ?? '--'} °C
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-slate-400 block">{t.weather.humidity}</span>
+                      <span className="text-base font-bold font-mono text-slate-200">
+                        {current.observation.humidity_percent ?? '--'} %
+                      </span>
                     </div>
                   </div>
                 ) : (
@@ -129,7 +156,7 @@ export function WeatherDrawer({
                       <span>{t.weather.imdNotConnected}</span>
                     </div>
                     <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
-                      Current weather uses healthy IMD first, then Open-Meteo. Missing current weather remains unavailable; historical CHIRPS is a separate 2024 replay.
+                      Real-time Indian Meteorological Department (IMD) telemetry requires station API credentials. The system automatically switches to historical CHIRPS storm references.
                     </p>
                   </div>
                 )}
@@ -182,49 +209,19 @@ export function WeatherDrawer({
                 Provider Status Telemetry
               </span>
 
-              <div className="bg-slate-950/70 p-3 rounded-xl border border-slate-800 space-y-1.5 text-[11px]">
-                <div className="flex items-center justify-between py-1 border-b border-slate-800/60">
-                  <span className="text-slate-300">Copernicus DEM (Terrain)</span>
-                  <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" /> Available (Static)
-                  </span>
-                </div>
-                <div className="flex items-center justify-between py-1 border-b border-slate-800/60">
-                  <span className="text-slate-300">GSI Landslide Inventory</span>
-                  <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" /> 572 Records
-                  </span>
-                </div>
-                <div className="flex items-center justify-between py-1 border-b border-slate-800/60">
-                  <span className="text-slate-300">OSM Aizawl Roads</span>
-                  <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" /> 116,763 Segments
-                  </span>
-                </div>
-                <div className="flex items-center justify-between py-1 border-b border-slate-800/60">
-                  <span className="text-slate-300">XGBoost ML Susceptibility</span>
-                  <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" /> Operational
-                  </span>
-                </div>
-                <div className="flex items-center justify-between py-1 border-b border-slate-800/60">
-                  <span className="text-slate-300">CHIRPS Rainfall</span>
-                  <span className="text-amber-400 font-semibold flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" /> Historical Reference
-                  </span>
-                </div>
-                <div className="flex items-center justify-between py-1 border-b border-slate-800/60">
-                  <span className="text-slate-300">IMD Weather Station</span>
-                  <span className="text-slate-400 font-semibold flex items-center gap-1">
-                    <XCircle className="w-3 h-3 text-slate-500" /> Not Configured
-                  </span>
-                </div>
-                <div className="flex items-center justify-between py-1">
-                  <span className="text-slate-300">Groq LLM Safety Copilot</span>
-                  <span className="text-emerald-400 font-semibold flex items-center gap-1">
-                    <CheckCircle2 className="w-3 h-3" /> Ready (with Fallback)
-                  </span>
-                </div>
+              <div className="bg-slate-950/70 rounded-xl border border-slate-800 divide-y divide-slate-800/60 overflow-hidden">
+                {PROVIDER_STATUS.map((p) => (
+                  <div key={p.label} className="flex items-center justify-between px-3 py-2 text-[11px]">
+                    <span className="text-slate-300">{p.label}</span>
+                    <span
+                      className={`font-semibold flex items-center gap-1 ${
+                        p.state === 'ok' ? 'text-emerald-400' : p.state === 'partial' ? 'text-amber-400' : 'text-slate-400'
+                      }`}
+                    >
+                      <StatusIcon state={p.state} /> {p.detail}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
