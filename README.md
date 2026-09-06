@@ -73,6 +73,32 @@ graph TD
 
 ## 📁 Repository Structure
 
+```
+.
+├── backend/                  # FastAPI async REST backend
+│   ├── app/
+│   │   ├── api/routes/       # Endpoints: risk, routing, copilot, reports, authority, weather...
+│   │   ├── core/             # Configuration & environment settings
+│   │   ├── i18n/             # Multilingual templates (en.json, hi.json, lus.json)
+│   │   ├── models/           # SQLAlchemy models & Pydantic V2 schemas
+│   │   ├── providers/        # IMD, CHIRPS, Copernicus, GSI adapters
+│   │   ├── services/         # HybridRiskService, RoutingService, CopilotService, MediaStorageService...
+│   │   └── main.py           # FastAPI application factory
+│   ├── data/                 # Raw & processed GSI landslide datasets (572 records)
+│   ├── migrations/           # Alembic database migrations
+│   ├── tests/                # Pytest test suite (19/19 passing)
+│   └── docs/                 # Backend GIS pipeline & SIH compliance docs
+├── data/
+│   └── gis/processed/        # Pre-computed Aizawl OSM graph (aizawl_road_graph.joblib)
+├── frontend/                 # Next.js 16 (App Router) + TypeScript + Tailwind CSS
+│   ├── public/               # PWA manifest, service worker, icons
+│   └── src/
+│       ├── app/              # Routes: /, /report, /route, /alerts, /authority
+│       ├── components/       # MapLibre GL engine, Copilot modal, Risk inspection, Review queue...
+│       └── lib/              # API client, config, i18n context (EN/HI/LUS), IndexedDB offline queue
+└── scripts/                  # Feature building, model auditing, and OSM graph processors
+```
+
 ---
 
 ## 🚀 Quickstart Guide
