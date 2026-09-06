@@ -1,4 +1,4 @@
-# 🛡️ Bhu Rakshak — AI-Assisted Landslide Risk & Connectivity Intelligence
+# 🛡️ Dhara Drishti — AI-Assisted Landslide Risk & Connectivity Intelligence
 
 > **Smart India Hackathon (SIH) Prototype**  
 > *Pilot Demonstration Region: Aizawl District, Mizoram, India (`92.60°E, 23.60°N` to `92.85°E, 23.85°N`)*
@@ -7,7 +7,7 @@
 
 ## 🌟 Overview
 
-**Bhu Rakshak** is an AI-assisted landslide risk estimation and disaster connectivity intelligence platform designed for complex Himalayan and North-Eastern terrains. Unlike generic weather or mapping dashboards, Bhu Rakshak strictly enforces **grounded, evidence-backed geospatial modeling** across:
+**Dhara Drishti** is an AI-assisted landslide risk estimation and disaster connectivity intelligence platform designed for complex Himalayan and North-Eastern terrains. Unlike generic weather or mapping dashboards, Dhara Drishti strictly enforces **grounded, evidence-backed geospatial modeling** across:
 
 1. **Multi-Source Hybrid Risk Engine**: Combines **Copernicus 30m DEM** slope/elevation, **572 Geological Survey of India (GSI)** historical landslide events, an experimental **XGBoost susceptibility model**, and **CHIRPS/IMD** rainfall telemetry.
 2. **Safer vs. Fastest Graph Routing**: Uses a pre-computed **NetworkX directed road graph** derived from **116,763 OpenStreetMap (OSM) segments in Aizawl** to route citizens and emergency responders away from high-hazard segments, calculating real risk reduction percentages and extra travel time.
@@ -19,7 +19,7 @@
 
 ## 🏛️ Grounded Reality & Safety Principles
 
-Bhu Rakshak strictly adheres to high-consequence public safety data ethics:
+Dhara Drishti strictly adheres to high-consequence public safety data ethics:
 
 - ❌ **No Predictive Hallucination**: The XGBoost model provides *spatial susceptibility conditioning*, never claiming to forecast exact future landslide timestamps.
 - ❌ **No Unverified Road Closures**: Citizen reports create incident candidates. **Only official DDMA verification** or explicit closure overrides remove edges from the active routing network.
@@ -183,7 +183,7 @@ Frontend Application: `http://localhost:3000`
 
 ## 📜 Smart India Hackathon (SIH) Compliance
 
-| SIH Requirement | Bhu Rakshak Implementation Status |
+| SIH Requirement | Dhara Drishti Implementation Status |
 | :--- | :--- |
 | **Landslide Hazard Modeling** | Multi-factor hybrid engine (Copernicus DEM slope, 572 GSI events, XGBoost susceptibility, CHIRPS/IMD). |
 | **Emergency Evacuation & Routing** | NetworkX Aizawl road graph; calculates safest vs fastest paths, risk reduction %, and avoids verified closures. |

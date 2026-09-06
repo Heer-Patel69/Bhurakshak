@@ -1,6 +1,6 @@
 export const en = {
   app: {
-    title: 'BHU RAKSHAK',
+    title: 'Dhara Drishti',
     subtitle: 'AI-Assisted Landslide Risk & Connectivity Intelligence',
     pilot: 'Aizawl Pilot, Mizoram',
     tagline: 'Grounded geospatial intelligence and early hazard response for hill terrain.',
@@ -94,7 +94,7 @@ export const en = {
   },
   copilot: {
     title: 'What Should I Do?',
-    subtitle: 'Grounded AI safety advice based on verified Bhu Rakshak data',
+    subtitle: 'Grounded AI safety advice based on verified Dhara Drishti data',
     askQuestion: 'Ask a specific safety question or click below for instant guidance at this location:',
     quickPrompt: 'Generate Emergency Safety Advice',
     summary: 'Situation Summary',
@@ -103,7 +103,7 @@ export const en = {
     emergency: 'Emergency Contacts',
     why: 'Underlying Factors',
     confidence: 'Assessment Confidence',
-    disclaimer: 'AI guidance based on Bhu Rakshak verified data. Always obey on-ground disaster management personnel.',
+    disclaimer: 'AI guidance based on Dhara Drishti verified data. Always obey on-ground disaster management personnel.',
   },
   weather: {
     title: 'Weather Intelligence',

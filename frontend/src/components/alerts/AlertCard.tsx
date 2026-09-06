@@ -82,7 +82,7 @@ export function AlertCard({ alert }: AlertCardProps) {
           <span>Issued: {new Date(alert.created_at).toLocaleString()}</span>
         </div>
         <div>
-          <span>Source: {alert.source || 'Bhu Rakshak Emergency Network'}</span>
+          <span>Source: {alert.source || 'Dhara Drishti Emergency Network'}</span>
         </div>
       </div>
     </div>

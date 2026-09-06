@@ -1,4 +1,4 @@
-# Bhu Rakshak SIH backend compliance
+# Dhara Drishti SIH backend compliance
 
 | Requirement | Status | Evidence / remaining work |
 |---|---|---|

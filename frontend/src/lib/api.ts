@@ -76,7 +76,7 @@ async function fetchJson<T>(
   } catch (error: any) {
     const apiError = error instanceof ApiError ? error : new ApiError(
       'NETWORK_ERROR',
-      error?.message || 'Failed to connect to Bhu Rakshak API server.',
+      error?.message || 'Failed to connect to Dhara Drishti API server.',
       0
     );
     if (typeof window !== 'undefined' && process.env.NODE_ENV === 'development') {

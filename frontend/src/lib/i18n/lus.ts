@@ -1,6 +1,6 @@
 export const lus = {
   app: {
-    title: 'BHU RAKSHAK',
+    title: 'Dhara Drishti',
     subtitle: 'Min Chhiatna Vengtu leh Kawng Hriatpuina AI Thawhchhuah',
     pilot: 'Aizawl Pilot, Mizoram',
     tagline: 'Tlangram tan leimin thlen theihna dinhmun leh kawng him zawng hriatna hmanrua.',
@@ -94,7 +94,7 @@ export const lus = {
   },
   copilot: {
     title: 'Engnge Ka Tih Ang?',
-    subtitle: 'Bhu Rakshak data dik tak atanga venhimna thurawn AI pek',
+    subtitle: 'Dhara Drishti data dik tak atanga venhimna thurawn AI pek',
     askQuestion: 'I hriat duh zawt la emaw thurawn rang tak la rawh:',
     quickPrompt: 'Hemi Hmun Atan Thurawn La Rawh',
     summary: 'Dinhmun Tlangpui',
@@ -103,7 +103,7 @@ export const lus = {
     emergency: 'Biakpawh Turte',
     why: 'A Chhan Liente',
     confidence: 'Rintlak Zat',
-    disclaimer: 'Bhu Rakshak data atanga siam a ni. Disaster Management hotute thu ngaichang hmasa ber ang che.',
+    disclaimer: 'Dhara Drishti data atanga siam a ni. Disaster Management hotute thu ngaichang hmasa ber ang che.',
   },
   weather: {
     title: 'Khawchin Hriatna',

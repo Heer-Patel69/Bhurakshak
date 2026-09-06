@@ -32,7 +32,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         title=settings.app_name,
         version="1.0.0",
         description=(
-            "Bhu Rakshak landslide susceptibility, infrastructure exposure, connectivity, and reporting API. "
+            "Dhara Drishti landslide susceptibility, infrastructure exposure, connectivity, and reporting API. "
             "Scores are risk estimates, not deterministic event predictions."
         ),
         lifespan=lifespan,

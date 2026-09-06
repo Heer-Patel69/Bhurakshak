@@ -21,7 +21,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    app_name: str = "Bhu Rakshak API"
+    app_name: str = "Dhara Drishti API"
     app_env: str = "development"
     api_v1_prefix: str = "/api/v1"
     log_level: str = "INFO"

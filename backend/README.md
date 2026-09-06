@@ -1,6 +1,6 @@
-# Bhu Rakshak backend
+# Dhara Drishti backend
 
-Production-structured FastAPI foundation for the Bhu Rakshak Aizawl pilot. The backend combines local historical/weather/terrain evidence, the existing experimental XGBoost susceptibility model, connectivity analysis interfaces, citizen reports, sensors, incidents, alerts, and provider health without claiming deterministic landslide prediction.
+Production-structured FastAPI foundation for the Dhara Drishti Aizawl pilot. The backend combines local historical/weather/terrain evidence, the existing experimental XGBoost susceptibility model, connectivity analysis interfaces, citizen reports, sensors, incidents, alerts, and provider health without claiming deterministic landslide prediction.
 
 The API never retrains from incoming reports. `scripts/retrain_model.py` is an explicit, gated admin job that writes a candidate artifact only after minimum-data and validation checks; production promotion additionally requires `--promote`.
 

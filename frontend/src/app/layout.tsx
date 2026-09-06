@@ -5,14 +5,14 @@ import { OfflineRuntime } from '@/components/offline/OfflineRuntime';
 import { DevDiagnosticsPanel } from '@/components/debug/DevDiagnosticsPanel';
 
 export const metadata: Metadata = {
-  title: 'Bhu Rakshak — AI-Assisted Landslide Risk & Connectivity Intelligence',
+  title: 'Dhara Drishti — AI-Assisted Landslide Risk & Connectivity Intelligence',
   description:
     'Grounded geospatial landslide risk estimation, real OSM road exposure, emergency routing, and citizen hazard reporting for Aizawl Pilot, Mizoram.',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Bhu Rakshak',
+    title: 'Dhara Drishti',
   },
 };
 

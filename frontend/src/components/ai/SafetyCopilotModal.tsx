@@ -65,7 +65,7 @@ export function SafetyCopilotModal({
               <h3 className="font-bold text-base text-white flex items-center gap-2">
                 <span>{t.copilot.title}</span>
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-400 border border-sky-500/20 font-mono">
-                  Bhu Rakshak Copilot
+                  Dhara Drishti Copilot
                 </span>
               </h3>
               <p className="text-xs text-slate-400">
@@ -123,7 +123,7 @@ export function SafetyCopilotModal({
                   {advice.summary}
                 </p>
                 <div className="mt-2 text-[10px] text-slate-400 flex items-center gap-2">
-                  <span>Source: {advice.recommendations_source === 'groq_grounded' ? 'Groq Grounded LLM' : 'Bhu Rakshak Deterministic Safety Engine'}</span>
+                  <span>Source: {advice.recommendations_source === 'groq_grounded' ? 'Groq Grounded LLM' : 'Dhara Drishti Deterministic Safety Engine'}</span>
                   <span>•</span>
                   <span>{advice.confidence_note}</span>
                 </div>

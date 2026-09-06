@@ -20,7 +20,7 @@ def health(request: Request) -> dict:
     services = request.app.state.services
     return {
         "status": "ok" if database_status == "available" else "degraded",
-        "service": "Bhu Rakshak API",
+        "service": "Dhara Drishti API",
         "environment": request.app.state.settings.app_env,
         "timestamp": datetime.now(UTC),
         "database": database_status,

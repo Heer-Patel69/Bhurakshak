@@ -100,7 +100,7 @@ export default function HelpPage() {
         {message && <div className="rounded-xl border border-sky-500/30 bg-sky-500/10 p-3 text-xs text-sky-200">{message}</div>}
 
         <section className="space-y-3">
-          <div><h2 className="flex items-center gap-2 text-sm font-bold text-white"><Hospital className="h-5 w-5 text-emerald-400" />Nearby known hospitals</h2><p className="mt-1 text-[11px] text-slate-500">Facility names and coordinates come from the configured Bhu Rakshak GIS dataset.</p></div>
+          <div><h2 className="flex items-center gap-2 text-sm font-bold text-white"><Hospital className="h-5 w-5 text-emerald-400" />Nearby known hospitals</h2><p className="mt-1 text-[11px] text-slate-500">Facility names and coordinates come from the configured Dhara Drishti GIS dataset.</p></div>
           {hospitals.length ? hospitals.map(({ facility, distance }) => {
             const [longitude, latitude] = facility.geometry.coordinates;
             return <div key={facility.properties.facility_id || facility.properties.name} className="flex flex-col gap-3 rounded-xl border border-slate-800 bg-slate-900 p-4 sm:flex-row sm:items-center sm:justify-between"><div><div className="text-sm font-bold text-slate-200">{facility.properties.name}</div><div className="mt-1 text-[11px] text-slate-400">{facility.properties.facility_type}{distance === null ? '' : ` · ${distance.toFixed(1)} km straight-line`}</div></div><a href={`https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`} target="_blank" rel="noreferrer" className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-4 text-xs font-bold text-emerald-300"><MapPin className="h-4 w-4" />Navigate</a></div>;
