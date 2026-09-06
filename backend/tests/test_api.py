@@ -35,7 +35,8 @@ def test_point_risk_works_with_historical_fallback(client):
     assert 0 <= payload["confidence_score"] <= 100
     assert payload["signals"]["rainfall"]["provider"] == "historical_chirps"
     assert payload["signals"]["rainfall"]["live"] is False
-    assert payload["signals"]["rainfall"]["provider_status"]["imd"]["status"] in {"disabled", "not_configured"}
+    assert payload["data_timestamp"].startswith("2024-05-28")
+    assert "imd" not in payload["signals"]["rainfall"]["provider_status"]
     assert payload["signals"]["ml"]["model_type"] == "experimental_storm_conditioned_spatial_susceptibility"
 
 
@@ -97,7 +98,7 @@ def test_citizen_report_is_idempotent_and_verifiable(client):
 
     verified = client.patch(
         f"/api/v1/reports/{report_id}/verify",
-        headers={"X-Authority-Key": "test-authority-key"},
+        headers={"Authorization": "Bearer test-supabase-jwt"},
         json={"status": "verified", "verified_by": "authority-test", "severity": "high"},
     )
     assert verified.status_code == 200

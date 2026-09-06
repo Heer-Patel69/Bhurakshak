@@ -81,16 +81,17 @@ class HistoricalCHIRPSProvider(WeatherProvider):
     def _observation(self, latitude: float, longitude: float, at: datetime | None) -> WeatherObservation | ProviderStatus:
         if self._records is None or self._records.empty:
             return self.health()
-        target = ensure_utc(at) if at else None
+        from ...core.risk_mode import REPLAY_DATE
+        target = ensure_utc(at or REPLAY_DATE)
         records = self._records
         if target:
-            eligible = records[records["date"] <= pd.Timestamp(target)]
+            eligible = records[records["date"].dt.normalize() == pd.Timestamp(target).normalize()]
             if eligible.empty:
                 return ProviderStatus(
                     provider=self.name,
                     status="no_historical_observation",
                     live=False,
-                    message="No CHIRPS record exists on or before the requested timestamp.",
+                    message="No CHIRPS record exists for the exact requested date.",
                 )
             row = eligible.iloc[-1]
         else:

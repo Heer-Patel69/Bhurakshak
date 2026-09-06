@@ -42,6 +42,7 @@ class IncidentService:
             matching.centroid_latitude = (matching.centroid_latitude * count + report.latitude) / (count + 1)
             matching.centroid_longitude = (matching.centroid_longitude * count + report.longitude) / (count + 1)
             matching.report_count += 1
+            matching.verified_report_count += 1
             matching.updated_at = datetime.now(UTC)
             matching.verification_status = "verified"
             matching.severity = report.ai_severity or matching.severity
@@ -54,6 +55,7 @@ class IncidentService:
                     centroid_longitude=report.longitude,
                     category=report.category,
                     report_count=1,
+                    verified_report_count=1,
                     verification_status="verified",
                     severity=report.ai_severity or "unknown",
                     affected_road_ids=[],
@@ -62,4 +64,3 @@ class IncidentService:
         report.incident_id = incident.incident_id
         session.flush()
         return incident
-

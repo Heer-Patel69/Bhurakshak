@@ -85,11 +85,33 @@ class IncidentDB(Base):
     centroid_longitude: Mapped[float] = mapped_column(Float)
     category: Mapped[str] = mapped_column(String(64), index=True)
     report_count: Mapped[int] = mapped_column(Integer, default=1)
+    verified_report_count: Mapped[int] = mapped_column(Integer, default=1)
     verification_status: Mapped[str] = mapped_column(String(32), default="pending", index=True)
     severity: Mapped[str] = mapped_column(String(32), default="unknown")
     affected_road_ids: Mapped[list[str]] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow, index=True)
+
+
+class VerifiedTrainingCandidateDB(Base):
+    __tablename__ = "verified_training_candidates"
+
+    candidate_id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    incident_id: Mapped[str] = mapped_column(String(36), ForeignKey("incidents.incident_id"), unique=True, index=True)
+    source_report_id: Mapped[str] = mapped_column(String(36), ForeignKey("citizen_reports.report_id"), unique=True, index=True)
+    label: Mapped[int] = mapped_column(Integer, default=1)
+    latitude: Mapped[float] = mapped_column(Float)
+    longitude: Mapped[float] = mapped_column(Float)
+    event_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    category: Mapped[str] = mapped_column(String(64), index=True)
+    verification_source: Mapped[str] = mapped_column(String(128))
+    verified_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    weather_snapshot: Mapped[dict[str, Any]] = mapped_column(JSON)
+    terrain_values: Mapped[dict[str, Any]] = mapped_column(JSON)
+    data_provenance: Mapped[dict[str, Any]] = mapped_column(JSON)
+    feature_schema_version: Mapped[str] = mapped_column(String(32), default="five-feature-v1")
+    dataset_version: Mapped[str] = mapped_column(String(64), index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
 
 
 class SensorDeviceDB(Base):

@@ -2,6 +2,11 @@
   "model_name": "experimental_storm_conditioned_spatial_susceptibility_xgboost",
   "model_type": "experimental_storm_conditioned_spatial_susceptibility",
   "model_version": "1.0.0",
+  "trained_at": "2026-09-02T00:00:00+00:00",
+  "training_sample_count": 351,
+  "feature_schema": "five-feature-v1",
+  "dataset_version": "remal-2024-generated-v1",
+  "production_model": true,
   "framework": "xgboost",
   "framework_version": "3.4.1",
   "features": [

@@ -88,6 +88,8 @@ export const en = {
     slope_movement: 'Active Ground Movement',
     collapsed_retaining_wall: 'Collapsed Retaining Wall',
     flash_flood: 'Flash Flood / Torrent',
+    road_damage: 'Road Damage',
+    low_visibility: 'Low Visibility',
     unknown: 'Other Geological Hazard',
   },
   copilot: {

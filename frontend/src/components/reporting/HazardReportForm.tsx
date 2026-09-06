@@ -1,118 +1,111 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
-import { useTranslation, type LanguageCode } from '@/lib/i18n/context';
+import React, { useEffect, useRef, useState } from 'react';
+import dynamic from 'next/dynamic';
+import { useTranslation } from '@/lib/i18n/context';
 import { api } from '@/lib/api';
 import { saveQueuedReport } from '@/lib/offline/db';
-import type { HazardCategory, LocationSource, ReporterType, CitizenReportPayload } from '@/lib/types';
+import { rememberPendingReport } from '@/lib/report-events';
+import type { CitizenReportPayload, HazardCategory, LocationSource } from '@/lib/types';
 import {
+  AlertOctagon,
   AlertTriangle,
+  ArrowLeft,
+  ArrowRight,
+  Camera,
+  CheckCircle2,
+  FileImage,
   Locate,
   MapPin,
-  Camera,
-  Video,
-  FileImage,
-  CheckCircle2,
-  AlertOctagon,
-  ArrowRight,
-  ArrowLeft,
-  Upload,
   RefreshCw,
-  Info,
   Shield,
-  Layers,
+  Upload,
 } from 'lucide-react';
 
-const CATEGORIES: Array<{ key: HazardCategory; label: string; icon: string; desc: string }> = [
-  { key: 'landslide', label: 'Active Landslide', icon: '⛰️', desc: 'Active earth/mud mass sliding down slope' },
-  { key: 'slope_crack', label: 'Slope / Tension Crack', icon: '⚡', desc: 'Visible ground fissures or slope cracks' },
-  { key: 'rockfall', label: 'Rockfall / Boulders', icon: '🪨', desc: 'Loose rocks falling or rolling onto terrain' },
-  { key: 'debris', label: 'Debris Flow', icon: '🌊', desc: 'Mud, gravel, and organic debris accumulation' },
-  { key: 'water_seepage', label: 'Water Seepage', icon: '💧', desc: 'Heavy unexplained water oozing from slope' },
-  { key: 'road_blockage', label: 'Road Blockage', icon: '🚧', desc: 'Slide material obstructing road traffic' },
-  { key: 'slope_movement', label: 'Slope Movement', icon: '📉', desc: 'Gradual creeping or shifting terrain' },
-  { key: 'collapsed_retaining_wall', label: 'Collapsed Retaining Wall', icon: '🧱', desc: 'Cracked, bulging, or fallen road wall' },
-  { key: 'flash_flood', label: 'Flash Flood / Torrent', icon: '🌧️', desc: 'Rapid mountain runoff washing away road' },
-  { key: 'unknown', label: 'Other Hazard', icon: '⚠️', desc: 'Other unidentified geological danger' },
+const ReportLocationMap = dynamic(
+  () => import('@/components/map/BhuRakshakMap').then((mod) => mod.BhuRakshakMap),
+  { ssr: false, loading: () => <div className="h-72 animate-pulse rounded-xl bg-slate-950" /> }
+);
+
+const CATEGORIES: Array<{ key: HazardCategory; label: string; icon: string }> = [
+  { key: 'landslide', label: 'Landslide', icon: '⛰️' },
+  { key: 'road_blockage', label: 'Road Blocked', icon: '🚧' },
+  { key: 'rockfall', label: 'Rockfall', icon: '🪨' },
+  { key: 'slope_crack', label: 'Slope Crack', icon: '⚡' },
+  { key: 'debris', label: 'Debris', icon: '🌊' },
+  { key: 'flash_flood', label: 'Flood / Water', icon: '🌧️' },
+  { key: 'road_damage', label: 'Road Damage', icon: '🛣️' },
+  { key: 'low_visibility', label: 'Low Visibility', icon: '🌫️' },
+  { key: 'unknown', label: 'Other', icon: '⚠️' },
 ];
 
+type Coordinates = { latitude: number; longitude: number; accuracy: number | null };
+
 export function HazardReportForm() {
-  const { t, language } = useTranslation();
+  const { language } = useTranslation();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const cameraInputRef = useRef<HTMLInputElement | null>(null);
-
-  // Form State
-  const [step, setStep] = useState<number>(1);
-  const [coords, setCoords] = useState<{ latitude: number; longitude: number; accuracy: number | null }>({
-    latitude: 23.7271,
-    longitude: 92.7176,
-    accuracy: null,
-  });
+  const [step, setStep] = useState(1);
+  const [coords, setCoords] = useState<Coordinates | null>(null);
   const [locationSource, setLocationSource] = useState<LocationSource>('device_gps');
+  const [showMap, setShowMap] = useState(false);
   const [category, setCategory] = useState<HazardCategory>('landslide');
   const [description, setDescription] = useState('');
-  const [placeName, setPlaceName] = useState('Aizawl');
-  const [landmark, setLandmark] = useState('');
-  const [roadName, setRoadName] = useState('');
-  const [selectedLanguage, setSelectedLanguage] = useState<'en' | 'hi' | 'lus'>(language);
-  const [reporterType, setReporterType] = useState<ReporterType>('citizen');
   const [mediaFile, setMediaFile] = useState<File | null>(null);
   const [mediaPreview, setMediaPreview] = useState<string | null>(null);
   const [mediaCapturedAt, setMediaCapturedAt] = useState<string | null>(null);
-
-  // Submission State
   const [isLocating, setIsLocating] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedReportId, setSubmittedReportId] = useState<string | null>(null);
   const [savedOffline, setSavedOffline] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // GPS Geolocation Handler
+  useEffect(() => () => {
+    if (mediaPreview) URL.revokeObjectURL(mediaPreview);
+  }, [mediaPreview]);
+
   const handleCaptureGPS = () => {
     if (!navigator.geolocation) {
-      alert('Geolocation is not supported by your browser. Please enter coordinates manually.');
+      setErrorMessage('Location is not supported on this device. Select the location on the map.');
+      setShowMap(true);
       return;
     }
-
     setIsLocating(true);
+    setErrorMessage(null);
     navigator.geolocation.getCurrentPosition(
       (pos) => {
-        setIsLocating(false);
-        setCoords({
-          latitude: pos.coords.latitude,
-          longitude: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
-        });
+        setCoords({ latitude: pos.coords.latitude, longitude: pos.coords.longitude, accuracy: pos.coords.accuracy });
         setLocationSource('device_gps');
-      },
-      (err) => {
+        setShowMap(false);
         setIsLocating(false);
-        console.warn('GPS capture error:', err);
-        alert('Could not access GPS. Please allow location permissions or set coordinates manually.');
-        setLocationSource('manual_pin');
+      },
+      () => {
+        setErrorMessage('GPS permission was unavailable. Select the hazard location on the map.');
+        setShowMap(true);
+        setIsLocating(false);
       },
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 0 }
     );
   };
 
-  // Media Selection Handler
-  const handleMediaChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleMapSelection = (point: { latitude: number; longitude: number }) => {
+    setCoords({ ...point, accuracy: null });
+    setLocationSource('manual_pin');
+    setErrorMessage(null);
+  };
 
-    // Check size limit (20MB)
+  const handleMediaChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
     if (file.size > 20 * 1024 * 1024) {
-      alert('File size exceeds 20MB limit. Please select a smaller photo or short video.');
+      setErrorMessage('File size exceeds 20 MB. Choose a smaller photo or short video.');
       return;
     }
-
+    if (mediaPreview) URL.revokeObjectURL(mediaPreview);
     setMediaFile(file);
     setMediaCapturedAt(new Date().toISOString());
-    const objectUrl = URL.createObjectURL(file);
-    setMediaPreview(objectUrl);
-
-    // Attach a fresh device location to the report metadata at capture/select time.
-    // We do not rewrite EXIF bytes; the protected report record is the source of truth.
+    setMediaPreview(URL.createObjectURL(file));
+    setErrorMessage(null);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (pos) => {
@@ -125,92 +118,81 @@ export function HazardReportForm() {
     }
   };
 
-  // Submit Handler
-  const handleSubmit = async () => {
-    setIsSubmitting(true);
-    setErrorMessage(null);
-
-    // Generate client-side UUID for offline idempotency
-    const clientReportId = typeof crypto !== 'undefined' && crypto.randomUUID
-      ? crypto.randomUUID()
-      : `rep_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-
-    const payload: CitizenReportPayload = {
-      report_id: clientReportId,
+  const buildPayload = (reportId: string): CitizenReportPayload | null => {
+    if (!coords) return null;
+    const categoryLabel = CATEGORIES.find((item) => item.key === category)?.label || 'Hazard';
+    return {
+      report_id: reportId,
       latitude: coords.latitude,
       longitude: coords.longitude,
       accuracy_m: coords.accuracy,
       timestamp: mediaCapturedAt || new Date().toISOString(),
       category,
-      description_original: description || `${t.categories[category]} reported at ${placeName}`,
-      language: selectedLanguage,
+      description_original: description.trim() || `${categoryLabel} reported by a citizen.`,
+      language,
       location_source: locationSource,
-      reporter_type: reporterType,
-      place_name: placeName,
-      landmark: landmark || undefined,
-      road_name: roadName || undefined,
+      reporter_type: 'citizen',
       district: 'Aizawl',
       offline_created_at: !navigator.onLine ? new Date().toISOString() : undefined,
     };
+  };
 
-    // If offline or request fails, queue in IndexedDB
+  const queueOffline = async (reportId: string, payload: CitizenReportPayload) => {
+    await saveQueuedReport({
+      local_id: reportId,
+      payload,
+      media_file: mediaFile,
+      media_filename: mediaFile?.name,
+      media_mime: mediaFile?.type,
+      status: 'pending',
+      created_at: Date.now(),
+    });
+    rememberPendingReport(reportId, payload, 'pending');
+    setSavedOffline(true);
+    setSubmittedReportId(reportId);
+    setStep(6);
+  };
+
+  const handleSubmit = async () => {
+    const clientReportId = crypto.randomUUID();
+    const payload = buildPayload(clientReportId);
+    if (!payload) {
+      setStep(1);
+      setErrorMessage('Choose the hazard location before submitting.');
+      return;
+    }
+    setIsSubmitting(true);
+    setErrorMessage(null);
     if (!navigator.onLine) {
       try {
-        await saveQueuedReport({
-          local_id: clientReportId,
-          payload,
-          media_file: mediaFile,
-          media_filename: mediaFile?.name,
-          media_mime: mediaFile?.type,
-          status: 'pending',
-          created_at: Date.now(),
-        });
-        setSavedOffline(true);
-        setSubmittedReportId(clientReportId);
-        setStep(8);
-      } catch (dbErr: any) {
-        setErrorMessage('Failed to store offline report: ' + dbErr.message);
+        await queueOffline(clientReportId, payload);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : 'Unknown storage error';
+        setErrorMessage(`Could not save the offline report: ${message}`);
       } finally {
         setIsSubmitting(false);
       }
       return;
     }
-
     try {
-      // 1. Submit report payload to FastAPI backend
       const result = await api.submitReport(payload);
-      const serverReportId = result.report_id || clientReportId;
-
-      // 2. Upload media if attached
+      const reportId = result.report_id || clientReportId;
       if (mediaFile) {
         try {
-          await api.uploadReportMedia(serverReportId, mediaFile);
-        } catch (mediaErr: any) {
-          console.warn('Media upload warning (report itself succeeded):', mediaErr);
+          await api.uploadReportMedia(reportId, mediaFile);
+        } catch (error) {
+          console.warn('Report saved, but media upload is waiting for a retry.', error);
         }
       }
-
-      setSubmittedReportId(serverReportId);
+      rememberPendingReport(reportId, payload, 'synced');
+      setSubmittedReportId(reportId);
       setSavedOffline(false);
-      setStep(8);
-    } catch (err: any) {
-      console.warn('Live report submission failed, falling back to offline queue:', err);
-      // Fallback to IndexedDB queue
+      setStep(6);
+    } catch (error: unknown) {
       try {
-        await saveQueuedReport({
-          local_id: clientReportId,
-          payload,
-          media_file: mediaFile,
-          media_filename: mediaFile?.name,
-          media_mime: mediaFile?.type,
-          status: 'pending',
-          created_at: Date.now(),
-        });
-        setSavedOffline(true);
-        setSubmittedReportId(clientReportId);
-        setStep(8);
+        await queueOffline(clientReportId, payload);
       } catch {
-        setErrorMessage(err.message || 'Submission failed. Please check network connection.');
+        setErrorMessage(error instanceof Error ? error.message : 'Submission failed. Check the connection and try again.');
       }
     } finally {
       setIsSubmitting(false);
@@ -218,10 +200,12 @@ export function HazardReportForm() {
   };
 
   const resetForm = () => {
+    if (mediaPreview) URL.revokeObjectURL(mediaPreview);
     setStep(1);
+    setCoords(null);
+    setShowMap(false);
+    setCategory('landslide');
     setDescription('');
-    setLandmark('');
-    setRoadName('');
     setMediaFile(null);
     setMediaPreview(null);
     setMediaCapturedAt(null);
@@ -230,568 +214,130 @@ export function HazardReportForm() {
     setErrorMessage(null);
   };
 
+  const nextFromLocation = () => {
+    if (!coords) {
+      setErrorMessage('Use GPS or select the hazard location on the map.');
+      return;
+    }
+    setErrorMessage(null);
+    setStep(2);
+  };
+
   return (
-    <div className="max-w-2xl mx-auto bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-4 sm:p-7 text-slate-100">
-      {/* Title & Step Header */}
-      <div className="pb-4 mb-5 border-b border-slate-800">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-10 h-10 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/30 flex items-center justify-center">
-              <AlertTriangle className="w-5 h-5" />
-            </div>
-            <div>
-              <h2 className="text-lg font-bold text-white">{t.report.title}</h2>
-              <p className="text-xs text-slate-400">{t.report.subtitle}</p>
-            </div>
+    <div className="mx-auto max-w-2xl rounded-2xl border border-slate-800 bg-slate-900 p-4 text-slate-100 shadow-2xl sm:p-7">
+      <div className="mb-5 flex items-center justify-between border-b border-slate-800 pb-4">
+        <div className="flex items-center gap-2.5">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/20 text-amber-400">
+            <AlertTriangle className="h-5 w-5" />
           </div>
-          {step <= 7 && (
-            <span className="text-xs font-mono font-bold text-sky-400 bg-sky-500/10 px-2.5 py-1 rounded-full border border-sky-500/20">
-              Step {step} / 7
-            </span>
-          )}
+          <div>
+            <h2 className="text-lg font-bold text-white">Report Hazard</h2>
+            <p className="text-xs text-slate-400">A short, geo-tagged report for emergency review.</p>
+          </div>
         </div>
+        {step <= 5 && <span className="rounded-full border border-sky-500/20 bg-sky-500/10 px-2.5 py-1 font-mono text-xs font-bold text-sky-400">Step {step} / 5</span>}
       </div>
 
       {errorMessage && (
-        <div className="mb-4 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-center gap-2">
-          <AlertOctagon className="w-4 h-4 flex-shrink-0" />
-          <span>{errorMessage}</span>
+        <div className="mb-4 flex items-start gap-2 rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-300">
+          <AlertOctagon className="h-4 w-4 shrink-0" /><span>{errorMessage}</span>
         </div>
       )}
 
-      {/* Wizard Steps */}
       {step === 1 && (
-        <div className="space-y-4 animate-in fade-in">
-          <div>
-            <h3 className="text-sm font-bold text-slate-200">{t.report.step1}</h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Accurate GPS coordinates help emergency response teams locate the hazard quickly.
-            </p>
-          </div>
-
-          <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-3">
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button
-                type="button"
-                onClick={handleCaptureGPS}
-                disabled={isLocating}
-                className="flex-1 py-3 px-4 bg-sky-600 hover:bg-sky-500 disabled:bg-slate-800 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-lg shadow-sky-600/20 transition-all"
-              >
-                <Locate className={`w-4 h-4 ${isLocating ? 'animate-spin' : ''}`} />
-                <span>{isLocating ? 'Acquiring GPS...' : t.report.useMyLocation}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setLocationSource('manual_pin')}
-                className={`py-3 px-4 rounded-xl font-bold text-xs flex items-center justify-center gap-2 border transition-all ${
-                  locationSource === 'manual_pin'
-                    ? 'bg-slate-800 text-sky-400 border-sky-500/40'
-                    : 'bg-slate-950 text-slate-400 border-slate-800 hover:text-white'
-                }`}
-              >
-                <MapPin className="w-4 h-4" />
-                <span>Manual Coordinates</span>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-2 gap-3 pt-2">
-              <div>
-                <label className="text-[11px] text-slate-400 block mb-1">Latitude</label>
-                <input
-                  type="number"
-                  step="0.0001"
-                  value={coords.latitude}
-                  onChange={(e) =>
-                    setCoords({ ...coords, latitude: parseFloat(e.target.value) || 23.7271 })
-                  }
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                />
-              </div>
-              <div>
-                <label className="text-[11px] text-slate-400 block mb-1">Longitude</label>
-                <input
-                  type="number"
-                  step="0.0001"
-                  value={coords.longitude}
-                  onChange={(e) =>
-                    setCoords({ ...coords, longitude: parseFloat(e.target.value) || 92.7176 })
-                  }
-                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 text-xs font-mono text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
-                />
-              </div>
-            </div>
-
-            {coords.accuracy !== null && (
-              <div className="text-[11px] text-emerald-400 flex items-center gap-1.5 pt-1">
-                <CheckCircle2 className="w-3.5 h-3.5" />
-                <span>GPS Accuracy: ±{coords.accuracy.toFixed(1)} meters</span>
-              </div>
-            )}
-          </div>
-
-          <div className="flex justify-end pt-2">
-            <button
-              type="button"
-              onClick={() => setStep(2)}
-              className="py-2.5 px-6 bg-sky-600 hover:bg-sky-500 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 transition-all"
-            >
-              <span>Next</span>
-              <ArrowRight className="w-4 h-4" />
+        <div className="space-y-4">
+          <div><h3 className="text-sm font-bold text-slate-200">Where is the hazard?</h3><p className="mt-1 text-xs text-slate-400">GPS accuracy and time are recorded automatically when available.</p></div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <button type="button" onClick={handleCaptureGPS} disabled={isLocating} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-sky-600 px-4 py-3 text-xs font-bold text-white hover:bg-sky-500 disabled:bg-slate-800">
+              <Locate className={`h-4 w-4 ${isLocating ? 'animate-spin' : ''}`} />{isLocating ? 'Finding location...' : 'Use My Location'}
+            </button>
+            <button type="button" onClick={() => setShowMap((value) => !value)} className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-xs font-bold text-slate-200 hover:border-sky-500">
+              <MapPin className="h-4 w-4 text-sky-400" />Select on Map
             </button>
           </div>
+          {showMap && <div className="h-72 overflow-hidden rounded-xl border border-slate-700"><ReportLocationMap selectedCoordinates={coords} onSelectCoordinates={handleMapSelection} /></div>}
+          {coords && (
+            <div className="flex items-start gap-2 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-200">
+              <CheckCircle2 className="h-4 w-4 shrink-0" /><div><div className="font-bold">Location captured</div><div className="font-mono text-[11px] text-slate-300">{coords.latitude.toFixed(5)}, {coords.longitude.toFixed(5)}{coords.accuracy !== null ? ` · ±${coords.accuracy.toFixed(0)} m` : ' · map pin'}</div></div>
+            </div>
+          )}
+          <div className="flex justify-end"><button type="button" onClick={nextFromLocation} className="flex min-h-11 items-center gap-1.5 rounded-xl bg-sky-600 px-6 py-2.5 text-xs font-bold text-white hover:bg-sky-500">Next <ArrowRight className="h-4 w-4" /></button></div>
         </div>
       )}
 
       {step === 2 && (
-        <div className="space-y-4 animate-in fade-in">
-          <div>
-            <h3 className="text-sm font-bold text-slate-200">{t.report.step2}</h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Select the primary observation category that best matches what you see.
-            </p>
+        <div className="space-y-4">
+          <div><h3 className="text-sm font-bold text-slate-200">What do you see?</h3><p className="mt-1 text-xs text-slate-400">Choose the closest quick option. Authorities can correct it during review.</p></div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {CATEGORIES.map((item) => <button key={item.key} type="button" onClick={() => setCategory(item.key)} className={`min-h-20 rounded-xl border p-3 text-left transition-colors ${category === item.key ? 'border-sky-500 bg-sky-950/50 text-white' : 'border-slate-800 bg-slate-950/70 text-slate-300 hover:border-slate-600'}`}><span className="block text-xl">{item.icon}</span><span className="mt-1 block text-xs font-bold">{item.label}</span></button>)}
           </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-[50vh] overflow-y-auto pr-1">
-            {CATEGORIES.map((cat) => (
-              <button
-                key={cat.key}
-                type="button"
-                onClick={() => setCategory(cat.key)}
-                className={`p-3 rounded-xl border text-left flex items-start gap-3 transition-all ${
-                  category === cat.key
-                    ? 'bg-sky-950/40 border-sky-500 text-white shadow-md shadow-sky-500/10'
-                    : 'bg-slate-950/60 border-slate-800/80 text-slate-400 hover:border-slate-700 hover:text-slate-200'
-                }`}
-              >
-                <span className="text-xl">{cat.icon}</span>
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-bold text-slate-200">{cat.label}</div>
-                  <div className="text-[10px] text-slate-400 mt-0.5 leading-tight">{cat.desc}</div>
-                </div>
-              </button>
-            ))}
-          </div>
-
-          <div className="flex justify-between pt-2">
-            <button
-              type="button"
-              onClick={() => setStep(1)}
-              className="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium text-xs flex items-center gap-1.5"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Back</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setStep(3)}
-              className="py-2.5 px-6 bg-sky-600 hover:bg-sky-500 text-white rounded-xl font-bold text-xs flex items-center gap-1.5"
-            >
-              <span>Next</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
+          <WizardActions back={() => setStep(1)} next={() => setStep(3)} />
         </div>
       )}
 
       {step === 3 && (
-        <div className="space-y-4 animate-in fade-in">
-          <div>
-            <h3 className="text-sm font-bold text-slate-200">{t.report.step3}</h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Provide context such as estimated slide width, whether rocks are still falling, or if road is passable.
-            </p>
-          </div>
-
-          <textarea
-            rows={5}
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            placeholder={t.report.descriptionPlaceholder}
-            className="w-full bg-slate-950 border border-slate-700 rounded-xl p-3.5 text-xs text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500"
-          />
-
-          <div className="flex justify-between pt-2">
-            <button
-              type="button"
-              onClick={() => setStep(2)}
-              className="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium text-xs flex items-center gap-1.5"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Back</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setStep(4)}
-              className="py-2.5 px-6 bg-sky-600 hover:bg-sky-500 text-white rounded-xl font-bold text-xs flex items-center gap-1.5"
-            >
-              <span>Next</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
+        <div className="space-y-4">
+          <div><h3 className="text-sm font-bold text-slate-200">Add a photo or short video</h3><p className="mt-1 text-xs text-slate-400">Optional. Evidence is visible to authenticated authority reviewers.</p></div>
+          <input ref={cameraInputRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={handleMediaChange} />
+          <input ref={fileInputRef} type="file" accept="image/*,video/*" className="hidden" onChange={handleMediaChange} />
+          {mediaPreview ? (
+            <div className="overflow-hidden rounded-xl border border-slate-700 bg-black">
+              {mediaFile?.type.startsWith('video/') ? <video src={mediaPreview} controls className="max-h-80 w-full object-contain" /> : <img src={mediaPreview} alt="Hazard evidence preview" className="max-h-80 w-full object-contain" />}
+              <div className="flex items-center justify-between bg-slate-950 p-3 text-[11px] text-slate-300"><span className="truncate">{mediaFile?.name}</span><button type="button" onClick={() => { setMediaFile(null); setMediaPreview(null); }} className="text-rose-300">Remove</button></div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <button type="button" onClick={() => cameraInputRef.current?.click()} className="flex min-h-24 items-center justify-center gap-2 rounded-xl border border-sky-500/30 bg-sky-500/10 text-xs font-bold text-sky-300"><Camera className="h-5 w-5" />Take Photo</button>
+              <button type="button" onClick={() => fileInputRef.current?.click()} className="flex min-h-24 items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-950 text-xs font-bold text-slate-300"><FileImage className="h-5 w-5" />Choose Photo / Video</button>
+            </div>
+          )}
+          <WizardActions back={() => setStep(2)} next={() => setStep(4)} nextLabel={mediaFile ? 'Next' : 'Skip'} />
         </div>
       )}
 
       {step === 4 && (
-        <div className="space-y-4 animate-in fade-in">
-          <div>
-            <h3 className="text-sm font-bold text-slate-200">{t.report.step4}</h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Local landmark or village name helps road maintenance crews reach the spot.
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">
-                {t.report.placeName} *
-              </label>
-              <input
-                type="text"
-                value={placeName}
-                onChange={(e) => setPlaceName(e.target.value)}
-                placeholder="e.g. Khatla, Bawngkawn, Durtlang, Falkawn"
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">
-                {t.report.landmark}
-              </label>
-              <input
-                type="text"
-                value={landmark}
-                onChange={(e) => setLandmark(e.target.value)}
-                placeholder="e.g. Near Government Primary School, 200m after petrol pump"
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
-              />
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">
-                {t.report.roadName}
-              </label>
-              <input
-                type="text"
-                value={roadName}
-                onChange={(e) => setRoadName(e.target.value)}
-                placeholder="e.g. NH-54, Treasury Bypass Road, Lengpui Link Road"
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500"
-              />
-            </div>
-          </div>
-
-          <div className="flex justify-between pt-2">
-            <button
-              type="button"
-              onClick={() => setStep(3)}
-              className="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium text-xs flex items-center gap-1.5"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Back</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setStep(5)}
-              className="py-2.5 px-6 bg-sky-600 hover:bg-sky-500 text-white rounded-xl font-bold text-xs flex items-center gap-1.5"
-            >
-              <span>Next</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
+        <div className="space-y-4">
+          <div><h3 className="text-sm font-bold text-slate-200">Add a short description</h3><p className="mt-1 text-xs text-slate-400">Optional. Say whether the road is passable or the hazard is still moving.</p></div>
+          <textarea rows={5} maxLength={500} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Example: rocks are still falling and one lane is blocked" className="w-full rounded-xl border border-slate-700 bg-slate-950 p-3.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500" />
+          <div className="text-right text-[10px] text-slate-500">{description.length}/500</div>
+          <WizardActions back={() => setStep(3)} next={() => setStep(5)} nextLabel={description ? 'Next' : 'Skip'} />
         </div>
       )}
 
-      {step === 5 && (
-        <div className="space-y-4 animate-in fade-in">
-          <div>
-            <h3 className="text-sm font-bold text-slate-200">{t.report.step5}</h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Visual proof enables AI & authority specialists to estimate hazard volume and damage severity.
-            </p>
+      {step === 5 && coords && (
+        <div className="space-y-4">
+          <div><h3 className="text-sm font-bold text-slate-200">Submit report</h3><p className="mt-1 text-xs text-slate-400">Check the essentials. No account is required for a citizen report.</p></div>
+          <div className="space-y-2 rounded-xl border border-slate-800 bg-slate-950/80 p-4 text-xs">
+            <SummaryRow label="Hazard" value={CATEGORIES.find((item) => item.key === category)?.label || category} />
+            <SummaryRow label="Location" value={`${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`} />
+            <SummaryRow label="Accuracy" value={coords.accuracy === null ? 'Map pin' : `±${coords.accuracy.toFixed(0)} m`} />
+            <SummaryRow label="Media" value={mediaFile ? mediaFile.name : 'None'} />
+            <SummaryRow label="Language" value={language.toUpperCase()} />
           </div>
-
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp,video/mp4"
-            className="hidden"
-            onChange={handleMediaChange}
-          />
-          <input
-            ref={cameraInputRef}
-            type="file"
-            accept="image/jpeg,image/png,image/webp"
-            capture="environment"
-            className="hidden"
-            onChange={handleMediaChange}
-          />
-
-          <div className="p-6 rounded-2xl border-2 border-dashed border-slate-700 bg-slate-950/40 text-center space-y-3">
-            {mediaPreview ? (
-              <div className="space-y-3">
-                {mediaFile?.type.startsWith('video') ? (
-                  <video src={mediaPreview} controls className="max-h-48 mx-auto rounded-lg border border-slate-700" />
-                ) : (
-                  <img src={mediaPreview} alt="Preview" className="max-h-48 mx-auto rounded-lg border border-slate-700 object-cover" />
-                )}
-                <div className="text-xs text-slate-300 font-mono">
-                  {mediaFile?.name} ({(mediaFile?.size || 0) / 1024 > 1024 ? `${((mediaFile?.size || 0) / (1024 * 1024)).toFixed(1)} MB` : `${((mediaFile?.size || 0) / 1024).toFixed(0)} KB`})
-                </div>
-                <div className="flex items-center justify-center gap-1.5 text-[11px] text-emerald-400">
-                  <MapPin className="w-3.5 h-3.5" />
-                  GPS attached to report · {coords.latitude.toFixed(5)}, {coords.longitude.toFixed(5)}
-                  {coords.accuracy !== null ? ` · ±${coords.accuracy.toFixed(0)}m` : ''}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setMediaFile(null);
-                    setMediaPreview(null);
-                    setMediaCapturedAt(null);
-                  }}
-                  className="px-3 py-1 bg-rose-500/20 text-rose-300 border border-rose-500/30 rounded-lg text-xs hover:bg-rose-500/30"
-                >
-                  Remove File
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                <div className="w-12 h-12 rounded-full bg-slate-800 text-sky-400 flex items-center justify-center mx-auto">
-                  <Camera className="w-6 h-6" />
-                </div>
-                <div>
-                  <p className="text-xs font-semibold text-slate-300">
-                    Capture Photo, Record Video, or Upload Media
-                  </p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    JPEG, PNG, WebP, MP4 (Max 20MB)
-                  </p>
-                </div>
-                <div className="flex justify-center gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    className="py-2 px-4 bg-sky-600 hover:bg-sky-500 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-sky-600/20"
-                  >
-                    <Upload className="w-4 h-4" />
-                    <span>{t.report.chooseFile}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => cameraInputRef.current?.click()}
-                    className="py-2 px-4 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl font-bold text-xs flex items-center gap-1.5"
-                  >
-                    <Camera className="w-4 h-4" />
-                    <span>Take photo</span>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="flex justify-between pt-2">
-            <button
-              type="button"
-              onClick={() => setStep(4)}
-              className="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium text-xs flex items-center gap-1.5"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Back</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setStep(6)}
-              className="py-2.5 px-6 bg-sky-600 hover:bg-sky-500 text-white rounded-xl font-bold text-xs flex items-center gap-1.5"
-            >
-              <span>Next</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
+          <div className="flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-[11px] text-amber-100"><Shield className="h-4 w-4 shrink-0" /><span>Citizen reports are Pending Verification. They never close a road until an authority confirms the closure.</span></div>
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+            <button type="button" onClick={() => setStep(4)} className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl bg-slate-800 px-4 py-2.5 text-xs font-medium text-slate-300"><ArrowLeft className="h-4 w-4" />Back</button>
+            <button type="button" onClick={handleSubmit} disabled={isSubmitting} className="flex min-h-12 items-center justify-center gap-2 rounded-xl bg-amber-600 px-7 py-3 text-xs font-bold text-white hover:bg-amber-500 disabled:bg-slate-800">{isSubmitting ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}{isSubmitting ? 'Saving report...' : 'Submit Hazard Report'}</button>
           </div>
         </div>
       )}
 
       {step === 6 && (
-        <div className="space-y-4 animate-in fade-in">
-          <div>
-            <h3 className="text-sm font-bold text-slate-200">{t.report.step6}</h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Identify reporting language and provenance.
-            </p>
-          </div>
-
-          <div className="space-y-3">
-            <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">Language</label>
-              <select
-                value={selectedLanguage}
-                onChange={(e) => setSelectedLanguage(e.target.value as any)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
-              >
-                <option value="en">English (en)</option>
-                <option value="hi">हिंदी (hi)</option>
-                <option value="lus">Mizo ṭawng (lus)</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="text-xs font-semibold text-slate-300 block mb-1">Reporter Role</label>
-              <select
-                value={reporterType}
-                onChange={(e) => setReporterType(e.target.value as any)}
-                className="w-full bg-slate-950 border border-slate-700 rounded-xl px-3.5 py-2.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-sky-500 cursor-pointer"
-              >
-                <option value="citizen">Citizen / Resident</option>
-                <option value="field_official">Field Disaster Officer / First Responder</option>
-                <option value="authority">District Disaster Management Authority</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="flex justify-between pt-2">
-            <button
-              type="button"
-              onClick={() => setStep(5)}
-              className="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium text-xs flex items-center gap-1.5"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Back</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setStep(7)}
-              className="py-2.5 px-6 bg-sky-600 hover:bg-sky-500 text-white rounded-xl font-bold text-xs flex items-center gap-1.5"
-            >
-              <span>Review</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      )}
-
-      {step === 7 && (
-        <div className="space-y-4 animate-in fade-in">
-          <div>
-            <h3 className="text-sm font-bold text-slate-200">{t.report.step7}</h3>
-            <p className="text-xs text-slate-400 mt-0.5">
-              Confirm report details before submitting to the emergency response queue.
-            </p>
-          </div>
-
-          <div className="p-4 rounded-xl bg-slate-950/80 border border-slate-800 space-y-2.5 text-xs">
-            <div className="flex justify-between py-1 border-b border-slate-800/80">
-              <span className="text-slate-400">Category:</span>
-              <span className="font-bold text-amber-300">{t.categories[category]}</span>
-            </div>
-            <div className="flex justify-between py-1 border-b border-slate-800/80">
-              <span className="text-slate-400">Location:</span>
-              <span className="font-mono text-slate-200">
-                {coords.latitude.toFixed(4)}°N, {coords.longitude.toFixed(4)}°E ({locationSource})
-              </span>
-            </div>
-            <div className="flex justify-between py-1 border-b border-slate-800/80">
-              <span className="text-slate-400">Place / Village:</span>
-              <span className="text-slate-200">{placeName}</span>
-            </div>
-            {landmark && (
-              <div className="flex justify-between py-1 border-b border-slate-800/80">
-                <span className="text-slate-400">Landmark:</span>
-                <span className="text-slate-200">{landmark}</span>
-              </div>
-            )}
-            {description && (
-              <div className="py-1 border-b border-slate-800/80">
-                <span className="text-slate-400 block mb-0.5">Description:</span>
-                <p className="text-slate-300 italic">{description}</p>
-              </div>
-            )}
-            <div className="flex justify-between py-1">
-              <span className="text-slate-400">Attached Media:</span>
-              <span className="text-slate-200">
-                {mediaFile ? `${mediaFile.name} (${(mediaFile.size / 1024).toFixed(0)} KB)` : 'None'}
-              </span>
-            </div>
-          </div>
-
-          {/* Official Disclaimer */}
-          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300 text-[11px] flex items-start gap-2">
-            <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <span>{t.report.disclaimer}</span>
-          </div>
-
-          <div className="flex justify-between pt-2">
-            <button
-              type="button"
-              onClick={() => setStep(6)}
-              className="py-2.5 px-4 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-medium text-xs flex items-center gap-1.5"
-            >
-              <ArrowLeft className="w-4 h-4" />
-              <span>Back</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={isSubmitting}
-              className="py-2.5 px-6 bg-gradient-to-r from-amber-600 to-rose-600 hover:from-amber-500 hover:to-rose-500 disabled:opacity-50 text-white rounded-xl font-bold text-xs flex items-center gap-2 shadow-lg shadow-amber-600/20"
-            >
-              {isSubmitting ? (
-                <>
-                  <RefreshCw className="w-4 h-4 animate-spin" />
-                  <span>{t.report.submitting}</span>
-                </>
-              ) : (
-                <>
-                  <Upload className="w-4 h-4" />
-                  <span>{t.report.submit}</span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {step === 8 && (
-        <div className="space-y-5 text-center py-6 animate-in fade-in">
-          <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 flex items-center justify-center mx-auto">
-            <CheckCircle2 className="w-8 h-8" />
-          </div>
-
-          <div>
-            <h3 className="text-base font-bold text-white">{t.report.successTitle}</h3>
-            <p className="text-xs text-slate-400 mt-1 max-w-md mx-auto">
-              {savedOffline ? t.report.savedOffline : 'Your report has been transmitted to the Bhu Rakshak Emergency Authority dashboard.'}
-            </p>
-          </div>
-
-          {submittedReportId && (
-            <div className="inline-block p-3 rounded-xl bg-slate-950 border border-slate-800 font-mono text-xs text-sky-400">
-              <span className="text-slate-500 text-[10px] block uppercase">{t.report.reportId}</span>
-              <span>{submittedReportId}</span>
-            </div>
-          )}
-
-          <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 text-[11px] text-slate-300 max-w-md mx-auto text-left space-y-1">
-            <div className="font-bold text-amber-400 flex items-center gap-1.5">
-              <Shield className="w-3.5 h-3.5" />
-              <span>{t.report.pendingVerification}</span>
-            </div>
-            <p className="text-slate-400 text-[10px]">
-              {t.report.disclaimer}
-            </p>
-          </div>
-
-          <div className="pt-2 flex justify-center gap-3">
-            <button
-              type="button"
-              onClick={resetForm}
-              className="py-2.5 px-6 bg-sky-600 hover:bg-sky-500 text-white rounded-xl font-bold text-xs"
-            >
-              Report Another Hazard
-            </button>
-          </div>
+        <div className="space-y-5 py-4 text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-emerald-500/30 bg-emerald-500/10 text-emerald-400"><CheckCircle2 className="h-8 w-8" /></div>
+          <div><h3 className="text-lg font-bold text-white">{savedOffline ? 'Report Saved Offline' : 'Report Submitted'}</h3><p className="mx-auto mt-2 max-w-md text-xs text-slate-400">{savedOffline ? 'It is safely queued on this device and will sync automatically when the connection returns.' : 'It now appears on this device as a Citizen Report — Pending Verification and is available to authority reviewers.'}</p></div>
+          <div className="rounded-xl border border-slate-800 bg-slate-950 p-3 font-mono text-[11px] text-slate-300">Report ID: {submittedReportId}</div>
+          <button type="button" onClick={resetForm} className="min-h-11 rounded-xl bg-sky-600 px-6 py-2.5 text-xs font-bold text-white hover:bg-sky-500">Report Another Hazard</button>
         </div>
       )}
     </div>
   );
+}
+
+function WizardActions({ back, next, nextLabel = 'Next' }: { back: () => void; next: () => void; nextLabel?: string }) {
+  return <div className="flex justify-between pt-2"><button type="button" onClick={back} className="flex min-h-11 items-center gap-1.5 rounded-xl bg-slate-800 px-4 py-2.5 text-xs font-medium text-slate-300 hover:bg-slate-700"><ArrowLeft className="h-4 w-4" />Back</button><button type="button" onClick={next} className="flex min-h-11 items-center gap-1.5 rounded-xl bg-sky-600 px-6 py-2.5 text-xs font-bold text-white hover:bg-sky-500">{nextLabel}<ArrowRight className="h-4 w-4" /></button></div>;
+}
+
+function SummaryRow({ label, value }: { label: string; value: string }) {
+  return <div className="flex items-start justify-between gap-4 border-b border-slate-800 pb-2 last:border-0 last:pb-0"><span className="text-slate-500">{label}</span><span className="text-right font-semibold text-slate-200">{value}</span></div>;
 }

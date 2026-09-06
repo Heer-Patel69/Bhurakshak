@@ -83,7 +83,7 @@ export function WeatherDrawer({
                 </span>
                 {current?.live ? (
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    LIVE IMD
+                    {current?.observation?.provider || 'Current Weather'}
                   </span>
                 ) : (
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-800 text-slate-400 border border-slate-700">
@@ -129,7 +129,7 @@ export function WeatherDrawer({
                       <span>{t.weather.imdNotConnected}</span>
                     </div>
                     <p className="text-[11px] text-slate-400 max-w-xs mx-auto">
-                      Real-time Indian Meteorological Department (IMD) telemetry requires station API credentials. The system automatically switches to historical CHIRPS storm references.
+                      Current weather uses healthy IMD first, then Open-Meteo. Missing current weather remains unavailable; historical CHIRPS is a separate 2024 replay.
                     </p>
                   </div>
                 )}

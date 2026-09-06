@@ -2,7 +2,7 @@
 
 Production-structured FastAPI foundation for the Bhu Rakshak Aizawl pilot. The backend combines local historical/weather/terrain evidence, the existing experimental XGBoost susceptibility model, connectivity analysis interfaces, citizen reports, sensors, incidents, alerts, and provider health without claiming deterministic landslide prediction.
 
-No code in this backend retrains the model or writes into `data/Cleaned/`, `data/generated/`, or `backend/models/`.
+The API never retrains from incoming reports. `scripts/retrain_model.py` is an explicit, gated admin job that writes a candidate artifact only after minimum-data and validation checks; production promotion additionally requires `--promote`.
 
 ## What works locally
 
@@ -35,7 +35,15 @@ Copy-Item backend\.env.example backend\.env
 python -m uvicorn backend.app.main:app --reload
 ```
 
-Do not put the Supabase service-role key, sensor secret, authority key, SMS key, or provider credentials into committed files.
+Do not put the Supabase service-role key, authority test password, sensor secret, SMS key, or provider credentials into committed files.
+
+## Supabase authority login
+
+Set `SUPABASE_URL` and `SUPABASE_ANON_KEY` in `backend/.env`, and the matching `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` in `frontend/.env.local`. The anon key is public configuration; the service-role key is backend-only.
+
+Create a local test user in **Supabase Dashboard → Authentication → Users → Add user**, using the email stored as `DEV_AUTHORITY_EMAIL` and a password stored only as `DEV_AUTHORITY_PASSWORD` in `backend/.env`. Assign `{ "role": "authority" }` in that user's trusted `app_metadata` through the Supabase Admin API or Dashboard tooling. Do not use `user_metadata` for authorization. Reset the password from **Authentication → Users → user → Reset/Update password**.
+
+For a controlled local demonstration, you can instead set `AUTHORITY_SHARED_ACCESS_CODE` in `backend/.env` and enter it in the Command Center. It is excluded from Git, must be shared only with intended operators, and can be rotated by changing the local value and restarting the API. The backend also accepts Supabase Bearer JWTs whose server-fetched `app_metadata.role`/`roles` contains `authority` or `admin`.
 
 ## Acceptance calls
 

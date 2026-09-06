@@ -55,8 +55,13 @@ class HistoricalSusceptibilityService:
             "message": self.load_error,
         }
 
-    def score(self, latitude: float, longitude: float) -> HistoricalSusceptibility:
-        if not self.latitudes.size:
+    def score(self, latitude: float, longitude: float, at=None) -> HistoricalSusceptibility:
+        latitudes, longitudes = self.latitudes, self.longitudes
+        if at is not None and not self.frame.empty:
+            dates = pd.to_datetime(self.frame["date_parsed"], utc=True, errors="coerce")
+            mask = dates.notna() & (dates < pd.Timestamp(at).normalize())
+            latitudes, longitudes = latitudes[mask], longitudes[mask]
+        if not latitudes.size:
             return HistoricalSusceptibility(
                 historical_susceptibility_score=0,
                 nearest_historical_event_distance_m=40_000_000,
@@ -67,7 +72,7 @@ class HistoricalSusceptibilityService:
                 methodology="unavailable",
                 status="unavailable",
             )
-        distances = haversine_many_m(latitude, longitude, self.latitudes, self.longitudes)
+        distances = haversine_many_m(latitude, longitude, latitudes, longitudes)
         density = float(np.exp(-distances / self.bandwidth_m).sum())
         return HistoricalSusceptibility(
             historical_susceptibility_score=min(1.0, density / self.normalizer),
@@ -75,7 +80,7 @@ class HistoricalSusceptibilityService:
             historical_events_within_500m=int((distances <= 500).sum()),
             historical_events_within_1km=int((distances <= 1_000).sum()),
             historical_events_within_2km=int((distances <= 2_000).sum()),
-            inventory_size=int(self.latitudes.size),
+            inventory_size=int(latitudes.size),
             methodology=(
                 f"Exponential distance-decay density, bandwidth={self.bandwidth_m:.0f}m, "
                 f"normalized to inventory density p{self.normalization_percentile:g}"

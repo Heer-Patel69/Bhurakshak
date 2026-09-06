@@ -165,10 +165,10 @@ Frontend Application: `http://localhost:3000`
 
 | Variable | Scope | Purpose | Default / Fallback |
 | :--- | :--- | :--- | :--- |
-| `AUTHORITY_API_KEY` | Backend | DDMA Command Dashboard Access | `test-authority-key` |
 | `GROQ_API_KEY` | Backend | Grounded AI Safety Copilot (LLaMA-3.3-70b) | Deterministic Rules Engine |
-| `SUPABASE_URL` | Backend | Private Media Storage & Postgres | Local SQLite / Temp Storage |
+| `SUPABASE_URL` + `SUPABASE_ANON_KEY` | Backend | Supabase Auth JWT verification | Authority login unavailable until configured |
 | `SUPABASE_SERVICE_ROLE_KEY` | Backend | Backend Private Uploads (Never in frontend) | Local Fallback |
+| `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Frontend | Supabase email/password sign-in | Authority login unavailable until configured |
 | `IMD_API_KEY` | Backend | Real-time Indian Meteorological Dept API | Historical CHIRPS Reference |
 | `NEXT_PUBLIC_API_BASE_URL` | Frontend | Target FastAPI Backend URL | `http://localhost:8000` |
 
@@ -177,7 +177,7 @@ Frontend Application: `http://localhost:3000`
 ## 🧪 Verification & Test Results
 
 - **Backend Pytest Suite**: `19 / 19 tests passed` (API contracts, GIS connectivity, hybrid risk scoring, road exposure, offline report idempotency, signed media URLs).
-- **Frontend Production Build**: `Next.js 16.3.4 (Turbopack)` compiled all 6 routes (`/`, `/report`, `/route`, `/alerts`, `/authority`, `/_not-found`) with zero TypeScript errors.
+- **Frontend Production Build**: `Next.js 16.3.4 (Turbopack)` compiled the citizen, help, routing, alerts, and authority routes with zero TypeScript errors.
 
 ---
 
@@ -187,7 +187,7 @@ Frontend Application: `http://localhost:3000`
 | :--- | :--- |
 | **Landslide Hazard Modeling** | Multi-factor hybrid engine (Copernicus DEM slope, 572 GSI events, XGBoost susceptibility, CHIRPS/IMD). |
 | **Emergency Evacuation & Routing** | NetworkX Aizawl road graph; calculates safest vs fastest paths, risk reduction %, and avoids verified closures. |
-| **Citizen Hazard Crowdsourcing** | 7-step mobile wizard with GPS capture, 10 standardized categories, photo/video camera, and IndexedDB offline queue. |
+| **Citizen Hazard Crowdsourcing** | 5-step mobile wizard with GPS/map pin, 9 quick categories, optional photo/video, and IndexedDB offline queue. |
 | **Local Language Support** | Trilingual interface in **English**, **Hindi (हिंदी)**, and **Mizo (Mizo ṭawng)**. |
 | **Disaster Authority Dashboard** | DDMA incident clustering, report verification, signed media inspection, road closure broadcast, and hospital reachability queue. |
 | **Data Integrity & Privacy** | Private signed media URLs, no secret leakage, explicit data context banners (`LIVE`, `HISTORICAL`, `DEGRADED`). |

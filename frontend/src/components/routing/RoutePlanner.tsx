@@ -27,6 +27,27 @@ interface RoutePoint {
   label: string;
 }
 
+interface GroundedRouteAssessment {
+  location: string;
+  riskContext: string;
+  hazardousZones: string;
+  historicalEvidence: string;
+  weatherContext: string;
+  roadExposure: string;
+  nearestFacility: string;
+  recommendedAction: string;
+}
+
+function distanceKm(a: RoutePoint, coordinates: [number, number]): number {
+  const toRadians = (value: number) => (value * Math.PI) / 180;
+  const latDelta = toRadians(coordinates[1] - a.latitude);
+  const lonDelta = toRadians(coordinates[0] - a.longitude);
+  const lat1 = toRadians(a.latitude);
+  const lat2 = toRadians(coordinates[1]);
+  const value = Math.sin(latDelta / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(lonDelta / 2) ** 2;
+  return 6371 * 2 * Math.atan2(Math.sqrt(value), Math.sqrt(1 - value));
+}
+
 interface RoutePlannerProps {
   onRouteCalculated?: (routes: { fastest: RouteSegment; safer: RouteSegment } | null) => void;
   onPointsSelected?: (points: {
@@ -71,6 +92,7 @@ export function RoutePlanner({
   const [loading, setLoading] = useState(false);
   const [routeResult, setRouteResult] = useState<RouteCompareResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [groundedAssessment, setGroundedAssessment] = useState<GroundedRouteAssessment | null>(null);
 
   // Debounced search for Origin
   useEffect(() => {
@@ -166,6 +188,8 @@ export function RoutePlanner({
 
     setLoading(true);
     setError(null);
+    setGroundedAssessment(null);
+    setRouteResult(null);
     try {
       const result = await api.compareRoutes(
         { latitude: origin.latitude, longitude: origin.longitude },
@@ -180,7 +204,49 @@ export function RoutePlanner({
       }
     } catch (err: any) {
       console.warn('Route calculation error:', err);
-      setError(err.message || 'Could not find a valid route between these points in the road graph.');
+      const delta = 0.03;
+      const bbox = `${destination.longitude - delta},${destination.latitude - delta},${destination.longitude + delta},${destination.latitude + delta}`;
+      const [riskResult, roadResult, facilityResult] = await Promise.allSettled([
+        api.getRiskPoint(destination.latitude, destination.longitude),
+        api.getRoadExposure(bbox, 4),
+        api.getFacilities(),
+      ]);
+      const risk = riskResult.status === 'fulfilled' ? riskResult.value : null;
+      const roadExposure = roadResult.status === 'fulfilled' ? roadResult.value : null;
+      const facilities = facilityResult.status === 'fulfilled' ? facilityResult.value.features || [] : [];
+      const nearest = facilities
+        .map((facility) => ({ facility, distance: distanceKm(destination, facility.geometry.coordinates) }))
+        .sort((a, b) => a.distance - b.distance)[0];
+      const historical = risk?.signals.historical || risk?.signals.historical_susceptibility;
+      const rainfall = risk?.signals.rainfall;
+      const reports = risk?.signals.citizen_reports;
+      const exposed = roadExposure?.features || [];
+      const highExposure = exposed.filter((feature: any) => Number(feature.properties?.risk_score || 0) >= 60);
+      setGroundedAssessment({
+        location: `${destination.label} (${destination.latitude.toFixed(5)}, ${destination.longitude.toFixed(5)})`,
+        riskContext: risk
+          ? `${risk.risk_level.toUpperCase()} risk (${risk.risk_score.toFixed(1)}/100), ${risk.confidence_level} confidence.`
+          : 'Data unavailable for this area.',
+        hazardousZones: risk?.drivers?.length
+          ? risk.drivers.join('; ')
+          : 'No supported hazardous-zone driver is available for this point.',
+        historicalEvidence: historical
+          ? `${historical.historical_events_within_2km} inventory events within 2 km; nearest recorded event ${Math.round(historical.nearest_historical_event_distance_m)} m away.`
+          : 'Data unavailable for this area.',
+        weatherContext: rainfall?.status && rainfall.status !== 'unavailable'
+          ? `${rainfall.rainfall_24h_mm ?? 'Unavailable'} mm rainfall in 24 h. Source: ${rainfall.source || 'configured weather provider'} (${rainfall.live ? 'live' : 'reference'}).`
+          : 'Data unavailable for this area.',
+        roadExposure: exposed.length
+          ? `${exposed.length} known road segments assessed in the nearby window; ${highExposure.length} have risk exposure at or above 60/100.`
+          : 'Data unavailable for this area.',
+        nearestFacility: nearest
+          ? `${nearest.facility.properties.name} (${nearest.facility.properties.facility_type}), approximately ${nearest.distance.toFixed(1)} km straight-line distance. Road access is not confirmed.`
+          : 'Data unavailable for this area.',
+        recommendedAction: reports?.verified_reports_within_500m
+          ? `There ${reports.verified_reports_within_500m === 1 ? 'is' : 'are'} ${reports.verified_reports_within_500m} verified report(s) within 500 m. Avoid travel until an authority confirms road access.`
+          : 'Check official alerts and local authority instructions before travel. No route or safe corridor is inferred without a supported road path.',
+      });
+      setError('Detailed road routing is currently unavailable for this location.');
       if (onRouteCalculated) onRouteCalculated(null);
     } finally {
       setLoading(false);
@@ -397,12 +463,25 @@ export function RoutePlanner({
       </div>
 
       {error && (
-        <div className="p-3.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs flex items-start gap-2">
-          <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0 mt-0.5" />
+        <div className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs flex items-start gap-2">
+          <AlertTriangle className="w-4 h-4 text-amber-400 flex-shrink-0 mt-0.5" />
           <div>
-            <div className="font-bold">Route Calculation Failed</div>
-            <div className="text-[11px] text-rose-200/80 mt-0.5">{error}</div>
+            <div className="font-bold">Text-Based Safety Assessment</div>
+            <div className="text-[11px] text-amber-100/80 mt-0.5">{error}</div>
           </div>
+        </div>
+      )}
+
+      {groundedAssessment && (
+        <div className="space-y-2 rounded-xl border border-slate-700 bg-slate-950/80 p-4 text-[11px] text-slate-300">
+          <AssessmentRow label="Location" value={groundedAssessment.location} />
+          <AssessmentRow label="Available risk context" value={groundedAssessment.riskContext} />
+          <AssessmentRow label="Known hazardous zones" value={groundedAssessment.hazardousZones} />
+          <AssessmentRow label="Historical landslide evidence" value={groundedAssessment.historicalEvidence} />
+          <AssessmentRow label="Weather context" value={groundedAssessment.weatherContext} />
+          <AssessmentRow label="Known road exposure" value={groundedAssessment.roadExposure} />
+          <AssessmentRow label="Nearest known emergency facility" value={groundedAssessment.nearestFacility} />
+          <AssessmentRow label="Recommended action" value={groundedAssessment.recommendedAction} />
         </div>
       )}
 
@@ -498,6 +577,15 @@ export function RoutePlanner({
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function AssessmentRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="border-b border-slate-800 pb-2 last:border-0 last:pb-0">
+      <div className="font-bold text-sky-300">{label}</div>
+      <div className="mt-0.5 leading-relaxed">{value}</div>
     </div>
   );
 }

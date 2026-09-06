@@ -23,29 +23,27 @@ export default function AuthorityPage() {
   const [overview, setOverview] = useState<AuthorityOverviewResponse | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
 
-  useEffect(() => {
-    const saved = getAuthoritySession();
-    if (saved) {
-      setAuthorityKey(saved);
-      setIsAuthenticated(true);
-    }
-  }, []);
-
   const loadOverview = async (key: string) => {
     setLoading(true);
     try {
       const data = await api.getAuthorityOverview(key);
       setOverview(data);
+      setAuthorityKey(key);
       setIsAuthenticated(true);
     } catch (err) {
       console.warn('Authority login error:', err);
-      alert('Authentication failed. Please check the authority security key.');
+      alert('Authentication failed. Please sign in with an authority or admin Supabase account.');
       setIsAuthenticated(false);
       clearAuthoritySession();
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const saved = getAuthoritySession();
+    if (saved) void loadOverview(saved);
+  }, []);
 
   const handleLogin = (key: string) => {
     setAuthorityKey(key);
@@ -175,7 +173,7 @@ export default function AuthorityPage() {
             </div>
 
             {/* Active Tab Panel */}
-            <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl">
+            <div className="p-3 sm:p-5 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl overflow-hidden">
               {activeTab === 'reports' && (
                 <ReportReviewQueue
                   authorityKey={authorityKey}

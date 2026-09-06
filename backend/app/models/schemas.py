@@ -107,6 +107,8 @@ class RiskPointRequest(Location):
 
 
 class RiskPointResponse(APIModel):
+    mode: Literal["historical_2024", "current"] = "historical_2024"
+    scenario: str = "Historical reference"
     location: Location
     risk_score: float = Field(ge=0, le=100)
     risk_level: Literal["low", "medium", "high", "critical"]
@@ -130,6 +132,8 @@ class ReportCategory(StrEnum):
     slope_movement = "slope_movement"
     collapsed_retaining_wall = "collapsed_retaining_wall"
     flash_flood = "flash_flood"
+    road_damage = "road_damage"
+    low_visibility = "low_visibility"
     landslide = "landslide"
     unknown = "unknown"
 

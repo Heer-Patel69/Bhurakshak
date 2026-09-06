@@ -2,13 +2,18 @@
 
 import React from 'react';
 import type { AlertItem } from '@/lib/types';
-import { AlertTriangle, ShieldAlert, Info, Clock, MapPin, CheckCircle2 } from 'lucide-react';
+import { AlertTriangle, ShieldAlert, Clock, MapPin } from 'lucide-react';
 
 interface AlertCardProps {
   alert: AlertItem;
 }
 
 export function AlertCard({ alert }: AlertCardProps) {
+  const locationLabel = alert.location?.name
+    || alert.location?.label
+    || (alert.location?.latitude !== undefined && alert.location?.longitude !== undefined
+      ? `${Number(alert.location.latitude).toFixed(5)}, ${Number(alert.location.longitude).toFixed(5)}`
+      : 'Location not provided');
   const severityStyles = {
     critical: 'bg-rose-950/40 border-rose-600/60 text-rose-100',
     high: 'bg-orange-950/40 border-orange-500/50 text-orange-100',
@@ -42,6 +47,25 @@ export function AlertCard({ alert }: AlertCardProps) {
       <p className="text-xs text-slate-200 leading-relaxed font-medium">
         {alert.message}
       </p>
+
+      <div className="grid grid-cols-1 gap-2 text-[11px] sm:grid-cols-2">
+        <div className="rounded-lg border border-white/10 bg-slate-950/40 p-2.5">
+          <span className="font-bold text-slate-400">Location</span>
+          <div className="mt-0.5 flex items-start gap-1 text-slate-200"><MapPin className="mt-0.5 h-3 w-3 shrink-0" />{locationLabel}</div>
+        </div>
+        <div className="rounded-lg border border-white/10 bg-slate-950/40 p-2.5">
+          <span className="font-bold text-slate-400">Expires</span>
+          <div className="mt-0.5 text-slate-200">{alert.expires_at ? new Date(alert.expires_at).toLocaleString() : 'No expiry provided'}</div>
+        </div>
+        <div className="rounded-lg border border-white/10 bg-slate-950/40 p-2.5">
+          <span className="font-bold text-slate-400">Safer route availability</span>
+          <div className="mt-0.5 text-slate-200">{alert.location?.safer_route_available === true ? 'Available' : alert.location?.safer_route_available === false ? 'Unavailable' : 'Not assessed'}</div>
+        </div>
+        <div className="rounded-lg border border-white/10 bg-slate-950/40 p-2.5">
+          <span className="font-bold text-slate-400">Nearest emergency facility</span>
+          <div className="mt-0.5 text-slate-200">{alert.location?.nearest_emergency_facility || 'Not assessed'}</div>
+        </div>
+      </div>
 
       {alert.recommended_action && (
         <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 text-xs space-y-1">

@@ -13,6 +13,7 @@ from ..models.database import RiskSnapshotDB
 from ..models.schemas import Location, MLSusceptibility, RiskPointResponse, TerrainObservation, WeatherObservation
 from ..repositories.risk_repository import RiskRepository
 from .confidence_service import ConfidenceService
+from ..core.risk_mode import risk_mode, assessment_time
 
 
 class HybridRiskService:
@@ -131,14 +132,28 @@ class RiskOrchestrator:
         at: datetime | None = None,
         persist: bool = True,
     ) -> RiskPointResponse:
-        weather, weather_status = await self.weather.current(latitude, longitude, at=at)
+        at = assessment_time(at)
+        historical_mode = risk_mode.get() == "historical_2024"
+        if historical_mode:
+            result = await self.weather.historical.get_recent_rainfall(latitude, longitude, at=at)
+            weather = result if isinstance(result, WeatherObservation) else None
+            weather_status = {"historical_chirps": self.weather.historical.health().model_dump(mode="json")}
+        else:
+            weather, weather_status = await self.weather.current(latitude, longitude)
         terrain = self.terrain.lookup(latitude, longitude)
-        historical = self.historical.score(latitude, longitude)
-        sensor = self.sensors.nearest_signal(session, latitude, longitude)
-        satellite = await self.satellite.latest(latitude, longitude)
-        reports = self.reports.verified_signal(session, latitude, longitude)
+        historical = self.historical.score(latitude, longitude, at=at)
+        excluded = {"status": "unavailable", "reason": "No date-matched historical evidence", "live": False}
+        sensor = excluded if historical_mode else self.sensors.nearest_signal(session, latitude, longitude)
+        satellite = excluded if historical_mode else await self.satellite.latest(latitude, longitude)
+        reports = excluded if historical_mode else self.reports.verified_signal(session, latitude, longitude)
+        soil = {"status": "unavailable", "source": "Open-Meteo model-derived soil moisture", "physical_sensor": False}
+        if not historical_mode and weather and weather.provenance.get("soil_moisture") is not None:
+            soil = {**soil, "status": "available", "volumetric_water_content": weather.provenance["soil_moisture"],
+                    "unit": "m3/m3", "depth": "0–1 cm", "observation_time": weather.observation_time.isoformat(),
+                    "fusion_status": "context_only_unvalidated_soil_response; excluded from five-feature XGBoost"}
 
         signal_data: dict[str, dict[str, Any]] = {
+            "soil": soil,
             "rainfall": weather.model_dump(mode="json") if isinstance(weather, WeatherObservation) else {"status": "unavailable"},
             "terrain": terrain.model_dump(mode="json") if isinstance(terrain, TerrainObservation) else terrain,
             "historical": historical.model_dump(mode="json"),
@@ -146,7 +161,7 @@ class RiskOrchestrator:
             "satellite": self._satellite_signal(satellite),
             "verified_reports": reports,
         }
-        if isinstance(terrain, TerrainObservation) and isinstance(weather, WeatherObservation):
+        if isinstance(terrain, TerrainObservation) and isinstance(weather, WeatherObservation) and all(value is not None for value in (weather.rainfall_24h_mm, weather.rainfall_72h_mm, weather.rainfall_7d_mm)):
             ml_result: MLSusceptibility = self.ml.predict(
                 {
                     "elevation_m": terrain.elevation_m,
@@ -171,7 +186,7 @@ class RiskOrchestrator:
 
         evaluated = self.hybrid.evaluate_scores(signal_data)
         assessment_context = (
-            "live_operational" if isinstance(weather, WeatherObservation) and weather.live else "historical_reference_scenario"
+            "historical_reference_scenario" if historical_mode else ("live_operational" if isinstance(weather, WeatherObservation) and weather.live else "degraded_current")
         )
         if assessment_context == "historical_reference_scenario" and "live_weather" not in evaluated["missing_signals"]:
             evaluated["missing_signals"].append("live_weather")
@@ -181,6 +196,8 @@ class RiskOrchestrator:
         signal_data["terrain"]["score"] = component_scores["terrain"]
         data_sources = self._data_sources(signal_data)
         response = RiskPointResponse(
+            mode=risk_mode.get(),
+            scenario="Cyclone Remal" if historical_mode and at.date().isoformat() == "2024-05-28" else "Historical reference" if historical_mode else "Current AI-assisted risk",
             location=Location(latitude=latitude, longitude=longitude),
             signals=signal_data,
             generated_at=generated_at,

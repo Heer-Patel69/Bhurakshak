@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useTranslation, LanguageCode } from '@/lib/i18n/context';
 import { Shield, ShieldAlert, Map, AlertTriangle, Route, Bell, Radio, WifiOff, CloudRain, Sparkles, CheckCircle2 } from 'lucide-react';
+import { getRiskMode, selectRiskMode, type RiskMode } from '@/lib/risk-mode';
 import { api } from '@/lib/api';
 import type { BootstrapResponse } from '@/lib/types';
 import { subscribeSyncStatus, syncOfflineReports } from '@/lib/offline/sync';
@@ -44,13 +45,8 @@ export function Header({ onOpenWeather, onOpenCopilot, onOpenTelemetry }: Header
     };
   }, []);
 
-  const riskContext = bootstrap?.risk_context || 'historical_reference_scenario';
-  const mapNavTitle =
-    riskContext === 'live_operational'
-      ? 'Live Risk Map'
-      : riskContext === 'degraded_current'
-      ? 'Current Risk — Limited Data'
-      : 'Historical Risk Explorer';
+  const riskContext = getRiskMode() === 'historical_2024' ? 'historical_reference_scenario' : 'degraded_current';
+  const mapNavTitle = 'Risk Map';
 
   return (
     <header className="sticky top-0 z-40 w-full border-b border-slate-800 bg-slate-950/90 backdrop-blur-md">
@@ -75,7 +71,7 @@ export function Header({ onOpenWeather, onOpenCopilot, onOpenTelemetry }: Header
         </div>
       )}
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto px-2 sm:px-6 min-h-16 flex-wrap py-2 flex items-center justify-between gap-2">
         {/* Logo & Pilot Title */}
         <div className="flex items-center gap-3">
           <Link href="/" className="flex items-center gap-2.5 group">
@@ -98,24 +94,12 @@ export function Header({ onOpenWeather, onOpenCopilot, onOpenTelemetry }: Header
           </Link>
         </div>
 
-        {/* Data Context Badge */}
-        <div className="hidden md:flex items-center">
-          {riskContext === 'live_operational' ? (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-              <span>{t.context.live_operational}</span>
-            </div>
-          ) : riskContext === 'degraded_current' ? (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-500/10 text-rose-400 border border-rose-500/30">
-              <span className="w-2 h-2 rounded-full bg-rose-400" />
-              <span>{t.context.degraded_current}</span>
-            </div>
-          ) : (
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-500/10 text-amber-300 border border-amber-500/30" title="Operational risk calculated using historical CHIRPS storm reference scenario">
-              <span className="w-2 h-2 rounded-full bg-amber-400" />
-              <span>{t.context.historical_reference_scenario}</span>
-            </div>
-          )}
+        <div className="flex items-center">
+          <select aria-label="Risk mode" value={getRiskMode()} onChange={(e) => selectRiskMode(e.target.value as RiskMode)}
+            className="max-w-[180px] rounded-lg border border-amber-500/30 bg-slate-900 px-2 py-2 text-[10px] text-amber-200">
+            <option value="historical_2024">HISTORICAL REPLAY — 2024</option>
+            <option value="current">CURRENT AI-ASSISTED RISK</option>
+          </select>
         </div>
 
         {/* Navigation Links */}

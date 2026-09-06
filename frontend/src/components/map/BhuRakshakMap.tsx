@@ -5,6 +5,11 @@ import * as maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { AIZAWL_CONFIG, RISK_COLORS } from '@/lib/config';
 import { api } from '@/lib/api';
+import {
+  pendingReportToFeature,
+  reconcileVerifiedReports,
+  REPORT_SUBMITTED_EVENT,
+} from '@/lib/report-events';
 import { LayerControl, type ActiveLayers, type LayerStatusInfo } from './LayerControl';
 import { MapLegend } from './MapLegend';
 import { Locate, Navigation } from 'lucide-react';
@@ -63,6 +68,33 @@ export function BhuRakshakMap({
   const [layerControlOpen, setLayerControlOpen] = useState(false);
   const [isLocating, setIsLocating] = useState(false);
   const roadDebounceTimer = useRef<NodeJS.Timeout | null>(null);
+
+  const refreshCitizenReports = useCallback(async () => {
+    const map = mapRef.current;
+    const source = map?.getSource('citizen-reports') as maplibregl.GeoJSONSource | undefined;
+    if (!map || !source) return;
+    try {
+      const verified = await api.getMapReports();
+      const verifiedFeatures = verified.features || [];
+      const verifiedIds = verifiedFeatures
+        .map((feature: any) => feature?.properties?.report_id)
+        .filter(Boolean);
+      const pendingFeatures = reconcileVerifiedReports(verifiedIds).map(pendingReportToFeature);
+      source.setData({
+        type: 'FeatureCollection',
+        features: [...verifiedFeatures, ...pendingFeatures],
+      } as any);
+      setLayerStatuses((previous) => ({
+        ...previous,
+        reports: {
+          state: 'loaded',
+          count: `${verifiedFeatures.length + pendingFeatures.length} reports`,
+        },
+      }));
+    } catch {
+      // Retain the last good source; controlled polling will retry.
+    }
+  }, []);
 
   // Initialize MapLibre GL
   useEffect(() => {
@@ -150,6 +182,17 @@ export function BhuRakshakMap({
     };
   }, [interactive, onSelectCoordinates]);
 
+  useEffect(() => {
+    if (!mapLoaded) return;
+    const refresh = () => void refreshCitizenReports();
+    window.addEventListener(REPORT_SUBMITTED_EVENT, refresh);
+    const timer = window.setInterval(refresh, 15_000);
+    return () => {
+      window.removeEventListener(REPORT_SUBMITTED_EVENT, refresh);
+      window.clearInterval(timer);
+    };
+  }, [mapLoaded, refreshCitizenReports]);
+
   // Initialize all analytical layers and GeoJSON sources
   const initializeDataSources = async (map: maplibregl.Map) => {
     // 1. Risk Grid Layer (Polygons/Cells)
@@ -230,6 +273,10 @@ export function BhuRakshakMap({
                 ${props.ml_susceptibility_score !== undefined && props.ml_susceptibility_score !== null ? `
                   <div class="text-[11px]"><span class="text-slate-400">ML Susceptibility:</span> <strong class="font-mono text-indigo-300">${(Number(props.ml_susceptibility_score) * 100).toFixed(1)}%</strong></div>
                 ` : ''}
+                <div>Elevation: ${props.elevation_m ?? 'Unavailable'} m · Slope: ${props.slope_deg ?? 'Unavailable'}°</div>
+                <div>Rain 24h: ${props.rain24 ?? 'Unavailable'} · 72h: ${props.rain72 ?? 'Unavailable'} · 7d: ${props.rain7d ?? 'Unavailable'} mm</div>
+                <div>Historical signal: ${props.historical_susceptibility_score ?? 'Unavailable'} · Nearby (&lt;1 km): ${props.nearby_historical_landslides ?? 'Unavailable'}</div>
+                <div>Data year: ${props.data_year ?? 'Unavailable'} · ${props.scenario || ''}</div>
                 <div class="text-[10px] text-slate-400"><span class="font-semibold">Context:</span> ${props.context || props.assessment_context || 'Historical Reference'}</div>
                 <div class="text-[10px] text-slate-400 truncate"><span class="font-semibold">Sources:</span> ${props.data_sources || 'Terrain, Weather, Historical, ML'}</div>
                 <div class="text-[9px] text-slate-500 mt-1">${props.generated_at ? new Date(props.generated_at).toLocaleString() : ''}</div>
@@ -240,7 +287,7 @@ export function BhuRakshakMap({
 
         setLayerStatuses((prev) => ({
           ...prev,
-          riskGrid: { state: 'loaded', count: `${gridData.features?.length || 36} cells` },
+          riskGrid: { state: 'loaded', count: `${gridData.features?.length || 0} cells` },
         }));
       }
     } catch {
@@ -328,7 +375,7 @@ export function BhuRakshakMap({
           ...prev,
           historicalLandslides: {
             state: 'loaded',
-            count: `${historicalData.features?.length || 572} events`,
+            count: `${historicalData.features?.length || 0} events`,
           },
         }));
       }
@@ -580,7 +627,7 @@ export function BhuRakshakMap({
 
         setLayerStatuses((prev) => ({
           ...prev,
-          facilities: { state: 'loaded', count: `${facilitiesData.features?.length || 29} facilities` },
+          facilities: { state: 'loaded', count: `${facilitiesData.features?.length || 0} facilities` },
         }));
       }
     } catch {
@@ -591,9 +638,17 @@ export function BhuRakshakMap({
     try {
       const reportsData = await api.getMapReports();
       if (reportsData && !map.getSource('citizen-reports')) {
+        const verifiedFeatures = reportsData.features || [];
+        const verifiedIds = verifiedFeatures
+          .map((feature: any) => feature?.properties?.report_id)
+          .filter(Boolean);
+        const pendingFeatures = reconcileVerifiedReports(verifiedIds).map(pendingReportToFeature);
         map.addSource('citizen-reports', {
           type: 'geojson',
-          data: reportsData as any,
+          data: {
+            type: 'FeatureCollection',
+            features: [...verifiedFeatures, ...pendingFeatures],
+          } as any,
         });
 
         map.addLayer({
@@ -601,7 +656,13 @@ export function BhuRakshakMap({
           type: 'circle',
           source: 'citizen-reports',
           paint: {
-            'circle-color': '#f59e0b',
+            'circle-color': [
+              'match',
+              ['get', 'verification_status'],
+              'verified',
+              '#ef4444',
+              '#f59e0b',
+            ],
             'circle-radius': 7,
             'circle-stroke-width': 2.5,
             'circle-stroke-color': '#ffffff',
@@ -611,11 +672,13 @@ export function BhuRakshakMap({
         map.on('click', 'citizen-reports-layer', (e) => {
           if (!e.features || !e.features[0]) return;
           const props = (e.features[0].properties || {}) as any;
+          const isVerified = props.verification_status === 'verified';
           new maplibregl.Popup()
             .setLngLat(e.lngLat)
             .setHTML(`
               <div class="space-y-1 text-xs text-slate-100">
-                <div class="font-bold text-amber-400">⚠️ Verified Hazard Report</div>
+                <div class="font-bold ${isVerified ? 'text-rose-400' : 'text-amber-400'}">⚠️ ${isVerified ? 'Verified Hazard Report' : 'Citizen Report — Unverified'}</div>
+                <div><span class="text-slate-400">Status:</span> <strong>${isVerified ? 'Verified' : props.sync_status === 'pending' ? 'Pending Sync' : 'Pending Verification'}</strong></div>
                 <div><span class="text-slate-400">Category:</span> <strong class="capitalize">${props.category || 'Landslide'}</strong></div>
                 <div><span class="text-slate-400">Severity:</span> <span class="font-semibold uppercase text-rose-400">${props.severity || 'Medium'}</span></div>
                 <div class="text-slate-500 text-[10px]">Captured: ${props.captured_at ? new Date(props.captured_at).toLocaleDateString() : ''}</div>
@@ -626,7 +689,7 @@ export function BhuRakshakMap({
 
         setLayerStatuses((prev) => ({
           ...prev,
-          reports: { state: 'loaded', count: `${reportsData.features?.length || 0} reports` },
+          reports: { state: 'loaded', count: `${verifiedFeatures.length + pendingFeatures.length} reports` },
         }));
       }
     } catch {

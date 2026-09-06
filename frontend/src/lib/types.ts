@@ -19,7 +19,9 @@ export interface RiskPointResponse {
   confidence_score: number;
   confidence_level: ConfidenceLevel;
   signals: {
+    soil?: { status: string; volumetric_water_content?: number; source: string };
     rainfall?: {
+      provider?: string;
       source: string;
       rainfall_1h_mm?: number | null;
       rainfall_24h_mm?: number | null;
@@ -319,6 +321,8 @@ export type HazardCategory =
   | 'slope_movement'
   | 'collapsed_retaining_wall'
   | 'flash_flood'
+  | 'road_damage'
+  | 'low_visibility'
   | 'unknown';
 
 export type ReporterType = 'citizen' | 'field_official' | 'authority';

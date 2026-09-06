@@ -1,13 +1,18 @@
 'use client';
 
 import React, { useState } from 'react';
+import dynamic from 'next/dynamic';
 import { Header } from '@/components/navigation/Header';
 import { MobileNav } from '@/components/navigation/MobileNav';
 import { RoutePlanner } from '@/components/routing/RoutePlanner';
-import { BhuRakshakMap } from '@/components/map/BhuRakshakMap';
 import { WeatherDrawer } from '@/components/weather/WeatherDrawer';
 import { SafetyCopilotModal } from '@/components/ai/SafetyCopilotModal';
 import type { RouteSegment } from '@/lib/types';
+
+const BhuRakshakMap = dynamic(
+  () => import('@/components/map/BhuRakshakMap').then((mod) => mod.BhuRakshakMap),
+  { ssr: false, loading: () => <div className="h-full w-full animate-pulse bg-slate-900" /> }
+);
 
 export default function RoutePage() {
   const [fastestRoute, setFastestRoute] = useState<RouteSegment | null>(null);

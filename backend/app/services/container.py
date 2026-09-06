@@ -28,6 +28,7 @@ from .routing_service import RoutingService
 from .satellite_service import SatelliteService
 from .sensor_service import SensorService
 from .terrain_service import TerrainService
+from .training_candidate_service import TrainingCandidateService
 from .weather_service import WeatherService
 
 
@@ -49,6 +50,7 @@ class ServiceContainer:
         self.reports = CitizenReportService(settings)
         self.media = MediaStorageService(settings)
         self.incidents = IncidentService()
+        self.training_candidates = TrainingCandidateService()
         self.i18n = I18nService()
         self.hybrid = HybridRiskService(settings.risk_config_path)
         self.risk = RiskOrchestrator(

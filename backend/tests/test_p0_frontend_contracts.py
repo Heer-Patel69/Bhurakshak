@@ -37,10 +37,11 @@ def test_field_and_authority_report_trust(client):
 
 def test_authority_confirmation_creates_official_closure(client):
     created = client.post("/api/v1/reports", json=_report_payload()).json()
-    response = client.patch(f"/api/v1/reports/{created['report_id']}/verify", headers={"X-Authority-Key": "test-authority-key"}, json={"status": "verified", "verified_by": "officer-1", "severity": "high", "category": "road_blockage", "verification_note": "Inspected on site", "affected_road_id": "way/test/1", "confirmed_road_blockage": True})
+    response = client.patch(f"/api/v1/reports/{created['report_id']}/verify", headers={"Authorization": "Bearer test-supabase-jwt"}, json={"status": "verified", "verified_by": "officer-1", "severity": "high", "category": "road_blockage", "verification_note": "Inspected on site", "affected_road_id": "way/test/1", "confirmed_road_blockage": True})
     assert response.status_code == 200
     assert response.json()["report"]["authority_action_id"]
-    overview = client.get("/api/v1/authority/overview", headers={"X-Authority-Key": "test-authority-key"}).json()
+    assert response.json()["training_candidate_id"] is None  # No date-matched current archive; never use 2024 rainfall.
+    overview = client.get("/api/v1/authority/overview", headers={"Authorization": "Bearer test-supabase-jwt"}).json()
     assert any(item["road_id"] == "way/test/1" for item in overview["confirmed_closures"])
 
 

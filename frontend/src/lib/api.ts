@@ -1,3 +1,4 @@
+import { getRiskMode } from './risk-mode';
 import { API_BASE_URL } from './config';
 import type {
   AlertItem,
@@ -41,6 +42,7 @@ async function fetchJson<T>(
   const url = `${API_BASE_URL.replace(/\/$/, '')}${endpoint}`;
   const headers: Record<string, string> = {
     Accept: 'application/json',
+    'X-Risk-Mode': getRiskMode(),
     ...(options.headers as Record<string, string>),
   };
 
@@ -86,10 +88,11 @@ async function fetchJson<T>(
   }
 }
 
-function authorityHeaders(credential: string): Record<string, string> {
-  return credential.split('.').length === 3
-    ? { Authorization: `Bearer ${credential}` }
-    : { 'X-Authority-Key': credential };
+function authorityHeaders(accessToken: string): Record<string, string> {
+  if (accessToken.startsWith('shared:')) {
+    return { 'X-Authority-Key': accessToken.slice('shared:'.length) };
+  }
+  return { Authorization: `Bearer ${accessToken}` };
 }
 
 export const api = {

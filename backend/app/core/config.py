@@ -59,6 +59,7 @@ class Settings(BaseSettings):
 
     sensor_ingest_secret: str | None = None
     authority_api_key: str | None = None
+    authority_shared_access_code: str | None = None
     frontend_origins: str = "http://localhost:3000"
     supabase_storage_bucket: str = "hazard-reports"
     media_signed_url_seconds: int = Field(default=900, ge=60, le=86_400)

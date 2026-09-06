@@ -33,6 +33,18 @@ async def require_sensor_secret(request: Request) -> None:
 
 async def require_authority_key(request: Request) -> None:
     settings = request.app.state.settings
+    shared_code = request.headers.get("X-Authority-Key")
+    if settings.authority_shared_access_code and shared_code:
+        if secrets.compare_digest(shared_code, settings.authority_shared_access_code):
+            request.state.authority = {
+                "user_id": None,
+                "email": None,
+                "roles": ["authority"],
+                "auth_mode": "shared_access_code",
+            }
+            return
+        raise TerraWatchError("INVALID_AUTHORITY_CREDENTIALS", "Invalid shared authority access code.", status_code=401)
+
     authorization = request.headers.get("Authorization", "")
     if authorization.lower().startswith("bearer "):
         token = authorization[7:].strip()

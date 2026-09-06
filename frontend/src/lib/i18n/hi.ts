@@ -88,6 +88,8 @@ export const hi = {
     slope_movement: 'जमीन का खिसकना',
     collapsed_retaining_wall: 'सुरक्षा दीवार का गिरना',
     flash_flood: 'अचानक बाढ़ / तेज जलप्रवाह',
+    road_damage: 'सड़क क्षति',
+    low_visibility: 'कम दृश्यता',
     unknown: 'अन्य भूगर्भीय खतरा',
   },
   copilot: {

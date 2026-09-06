@@ -94,12 +94,16 @@ def list_reports(
 
 
 @router.patch("/{report_id}/verify", dependencies=[Depends(require_authority_key)])
-def verify_report(
+async def verify_report(
     report_id: str,
     payload: ReportVerification,
     request: Request,
     session: Session = Depends(get_db_session),
 ) -> dict:
+    authority = getattr(request.state, "authority", {})
+    actor_id = authority.get("user_id") or authority.get("email") if isinstance(authority, dict) else None
+    if actor_id:
+        payload = payload.model_copy(update={"verified_by": str(actor_id)})
     report = request.app.state.services.reports.verify(session, report_id, payload)
     incident = request.app.state.services.incidents.cluster_verified_report(session, report)
     action_id = __import__("uuid").uuid4().hex
@@ -114,9 +118,25 @@ def verify_report(
         )
     )
     report.authority_action_id = action_id
+    training_candidate = None
+    try:
+        with session.begin_nested():
+            training_candidate = await request.app.state.services.training_candidates.create_if_eligible(
+                session,
+                report,
+                incident,
+                request.app.state.services.risk,
+            )
+    except Exception:
+        # Candidate enrichment must never roll back an authority safety decision.
+        __import__("logging").getLogger("terrawatch.training_candidates").exception(
+            "Training-candidate enrichment failed",
+            extra={"report_id": report_id},
+        )
     if payload.confirmed_road_blockage and payload.status == "verified" and payload.affected_road_id:
         session.add(RoadStatusDB(road_status_id=__import__("uuid").uuid4().hex, road_id=payload.affected_road_id, status="officially_closed", source="authority", verified=True, geometry=None, observed_at=report.verified_at, expires_at=None))
     return {
         "report": CitizenReportRead.model_validate(report).model_dump(mode="json"),
         "incident_id": incident.incident_id if incident else None,
+        "training_candidate_id": training_candidate.candidate_id if training_candidate else None,
     }

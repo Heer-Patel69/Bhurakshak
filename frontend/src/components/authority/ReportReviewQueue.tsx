@@ -1,10 +1,11 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslation } from '@/lib/i18n/context';
 import { api } from '@/lib/api';
 import type { CitizenReportItem, ReportMediaItem } from '@/lib/types';
 import { CheckCircle2, XCircle, Clock, ShieldAlert, Eye, Image as ImageIcon, MapPin, Tag, Road, AlertTriangle } from 'lucide-react';
+import { REPORT_SUBMITTED_EVENT } from '@/lib/report-events';
 
 interface ReportReviewQueueProps {
   authorityKey: string;
@@ -19,6 +20,8 @@ export function ReportReviewQueue({ authorityKey, onActionComplete }: ReportRevi
   const [selectedReport, setSelectedReport] = useState<CitizenReportItem | null>(null);
   const [mediaList, setMediaList] = useState<ReportMediaItem[]>([]);
   const [loadingMedia, setLoadingMedia] = useState(false);
+  const [newReportIds, setNewReportIds] = useState<string[]>([]);
+  const knownReportIds = useRef<Set<string> | null>(null);
 
   // Review Form State
   const [actionStatus, setActionStatus] = useState<'verified' | 'rejected' | 'under_review'>('verified');
@@ -28,8 +31,8 @@ export function ReportReviewQueue({ authorityKey, onActionComplete }: ReportRevi
   const [confirmRoadClosure, setConfirmRoadClosure] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
 
-  const loadReports = async () => {
-    setLoading(true);
+  const loadReports = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await api.getAuthorityReports(
         authorityKey,
@@ -37,19 +40,40 @@ export function ReportReviewQueue({ authorityKey, onActionComplete }: ReportRevi
         0,
         50
       );
-      setReports(res.items || []);
+      const items = res.items || [];
+      const incomingIds = new Set(items.map((item) => item.report_id));
+      if (knownReportIds.current) {
+        const newIds = items
+          .filter((item) => !knownReportIds.current?.has(item.report_id))
+          .map((item) => item.report_id);
+        if (newIds.length) {
+          setNewReportIds((current) => [...new Set([...current, ...newIds])]);
+        }
+      }
+      knownReportIds.current = incomingIds;
+      setReports(items);
     } catch (err) {
       console.warn('Load authority reports error:', err);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
-  };
+  }, [authorityKey, filterStatus]);
 
   useEffect(() => {
-    loadReports();
-  }, [filterStatus, authorityKey]);
+    knownReportIds.current = null;
+    setNewReportIds([]);
+    void loadReports();
+    const refresh = () => void loadReports(true);
+    window.addEventListener(REPORT_SUBMITTED_EVENT, refresh);
+    const timer = window.setInterval(refresh, 15_000);
+    return () => {
+      window.removeEventListener(REPORT_SUBMITTED_EVENT, refresh);
+      window.clearInterval(timer);
+    };
+  }, [loadReports]);
 
   const handleSelectReport = async (report: CitizenReportItem) => {
+    setNewReportIds((current) => current.filter((id) => id !== report.report_id));
     setSelectedReport(report);
     setAffectedRoadId(report.affected_road_id || '');
     setVerificationNote(report.verification_note || '');
@@ -85,7 +109,7 @@ export function ReportReviewQueue({ authorityKey, onActionComplete }: ReportRevi
       );
 
       setSelectedReport(null);
-      await loadReports();
+      await loadReports(true);
       if (onActionComplete) onActionComplete();
     } catch (err: any) {
       alert('Verification update error: ' + err.message);
@@ -98,12 +122,12 @@ export function ReportReviewQueue({ authorityKey, onActionComplete }: ReportRevi
     <div className="space-y-4">
       {/* Filter Tabs */}
       <div className="flex items-center justify-between gap-2 border-b border-slate-800 pb-3">
-        <div className="flex gap-1.5 text-xs font-semibold">
+        <div className="flex min-w-0 gap-1.5 overflow-x-auto pb-1 text-xs font-semibold">
           {['pending', 'verified', 'under_review', 'rejected', 'all'].map((st) => (
             <button
               key={st}
               onClick={() => setFilterStatus(st)}
-              className={`px-3 py-1.5 rounded-lg capitalize transition-colors ${
+              className={`shrink-0 px-3 py-1.5 rounded-lg capitalize transition-colors ${
                 filterStatus === st
                   ? 'bg-sky-600 text-white shadow-md shadow-sky-600/20'
                   : 'bg-slate-900 text-slate-400 hover:text-slate-200 border border-slate-800'
@@ -140,6 +164,11 @@ export function ReportReviewQueue({ authorityKey, onActionComplete }: ReportRevi
             >
               <div className="flex items-start justify-between gap-2">
                 <div>
+                  {newReportIds.includes(r.report_id) && (
+                    <span className="mb-1 inline-flex rounded-full border border-sky-400/40 bg-sky-500/15 px-2 py-0.5 text-[9px] font-black tracking-wide text-sky-300">
+                      NEW REPORT
+                    </span>
+                  )}
                   <span className="font-bold text-xs text-slate-200 block">
                     {t.categories[r.category] || r.category}
                   </span>
@@ -179,8 +208,8 @@ export function ReportReviewQueue({ authorityKey, onActionComplete }: ReportRevi
 
       {/* Report Review & Media Inspection Modal */}
       {selectedReport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-xs animate-in fade-in">
-          <div className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-6 text-slate-100 max-h-[90vh] overflow-y-auto space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/75 backdrop-blur-xs animate-in fade-in">
+          <div className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl p-4 sm:p-6 text-slate-100 max-h-[94vh] sm:max-h-[90vh] overflow-y-auto space-y-4">
             <div className="flex items-start justify-between pb-3 border-b border-slate-800">
               <div>
                 <h3 className="font-bold text-base text-white flex items-center gap-2">
@@ -241,7 +270,7 @@ export function ReportReviewQueue({ authorityKey, onActionComplete }: ReportRevi
                 Authority Action & Road Closure Impact
               </span>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="text-[11px] text-slate-400 block mb-1">Verification Decision</label>
                   <select

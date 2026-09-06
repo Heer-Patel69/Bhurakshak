@@ -88,6 +88,8 @@ export const lus = {
     slope_movement: 'Lei Che / Kham Che',
     collapsed_retaining_wall: 'Retaining Wall / Bang Chim',
     flash_flood: 'Tuilian / Tuiluak Nasa',
+    road_damage: 'Kawng Chhiatna',
+    low_visibility: 'Hmuh Theih Lohna',
     unknown: 'Chhiatna Dang',
   },
   copilot: {

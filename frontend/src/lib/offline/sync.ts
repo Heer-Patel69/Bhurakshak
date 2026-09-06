@@ -1,6 +1,7 @@
 import { api } from '../api';
 import { deleteQueuedReport, getPendingReports, updateQueuedReport } from './db';
 import type { OfflineQueuedReport } from '../types';
+import { rememberPendingReport } from '../report-events';
 
 export type SyncCallback = (status: {
   isSyncing: boolean;
@@ -72,6 +73,7 @@ export async function syncOfflineReports(): Promise<{ synced: number; failed: nu
         }
 
         item.status = 'synced';
+        rememberPendingReport(serverReport.report_id, item.payload, 'synced');
         await deleteQueuedReport(item.local_id);
         synced++;
       } catch (err: any) {

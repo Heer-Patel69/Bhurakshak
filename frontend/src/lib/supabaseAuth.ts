@@ -2,6 +2,13 @@ import { SUPABASE_AUTH_CONFIGURED, SUPABASE_PUBLIC_KEY, SUPABASE_URL } from './c
 
 const SESSION_KEY = 'bhurakshak_supabase_access_token';
 
+export function signInWithSharedAuthorityCode(accessCode: string): string {
+  if (!accessCode.trim()) throw new Error('Enter the shared authority access code.');
+  const session = `shared:${accessCode.trim()}`;
+  sessionStorage.setItem(SESSION_KEY, session);
+  return session;
+}
+
 export async function signInAuthority(email: string, password: string): Promise<string> {
   if (!SUPABASE_AUTH_CONFIGURED) {
     throw new Error('Supabase Auth is not configured for this frontend.');

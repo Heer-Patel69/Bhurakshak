@@ -14,6 +14,7 @@ from sqlalchemy.orm import Session
 
 from ..core.exceptions import TerraWatchError
 from ..utils.geo import parse_bbox
+from ..core.risk_mode import risk_mode, assessment_time
 
 
 @dataclass
@@ -166,7 +167,8 @@ class RiskGridService:
                 f"Requested {cells} cells; maximum is {self.max_cells} ({largest}x{largest}).",
                 status_code=422,
             )
-        key = f"{west},{south},{east},{north}:{resolution}:{at.isoformat() if at else 'latest'}"
+        at = assessment_time(at)
+        key = f"{risk_mode.get()}:{west},{south},{east},{north}:{resolution}:{at.isoformat() if at else 'latest'}"
         cached = self.cache.get(key)
         now_monotonic = time.monotonic()
         if cached and now_monotonic - cached[0] <= self.cache_seconds:
@@ -193,6 +195,16 @@ class RiskGridService:
                 signals = result.signals
                 assessment_context = result.assessment_context
                 properties = {
+                    "mode": result.mode,
+                    "scenario": result.scenario,
+                    "data_timestamp": result.data_timestamp.isoformat() if result.data_timestamp else None,
+                    "data_year": result.data_timestamp.year if result.data_timestamp else None,
+                    "elevation_m": signals["terrain"].get("elevation_m"),
+                    "slope_deg": signals["terrain"].get("slope_deg"),
+                    "rain24": signals["rainfall"].get("rainfall_24h_mm"),
+                    "rain72": signals["rainfall"].get("rainfall_72h_mm"),
+                    "rain7d": signals["rainfall"].get("rainfall_7d_mm"),
+                    "nearby_historical_landslides": signals["historical"].get("historical_events_within_1km"),
                     "risk_score": result.risk_score,
                     "risk_level": result.risk_level,
                     "confidence_score": result.confidence_score,
@@ -205,7 +217,7 @@ class RiskGridService:
                     "assessment_context": result.assessment_context,
                     "context": result.assessment_context,
                     "data_sources": ", ".join(
-                        f"{item['signal']}:{item['status']}" for item in result.data_sources
+                        f"{item['source']} ({item['status']})" for item in result.data_sources
                     ),
                     "center_longitude": longitude,
                     "center_latitude": latitude,

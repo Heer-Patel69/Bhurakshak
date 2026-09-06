@@ -14,6 +14,9 @@ depends_on = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    existing_columns = {column["name"] for column in inspector.get_columns("citizen_reports")}
     columns = (
         sa.Column("reporter_type", sa.String(32), nullable=False, server_default="citizen"),
         sa.Column("place_name", sa.String(240)), sa.Column("landmark", sa.String(500)),
@@ -26,9 +29,20 @@ def upgrade() -> None:
         sa.Column("client_created_at", sa.DateTime(timezone=True)), sa.Column("sync_status", sa.String(32), nullable=False, server_default="synced"),
     )
     for column in columns:
-        op.add_column("citizen_reports", column)
-    op.create_index("ix_citizen_reports_reporter_type", "citizen_reports", ["reporter_type"])
-    op.create_index("ix_citizen_reports_affected_road_id", "citizen_reports", ["affected_road_id"])
+        if column.name not in existing_columns:
+            op.add_column("citizen_reports", column)
+    existing_indexes = {index["name"] for index in inspector.get_indexes("citizen_reports")}
+    if "ix_citizen_reports_reporter_type" not in existing_indexes:
+        op.create_index("ix_citizen_reports_reporter_type", "citizen_reports", ["reporter_type"])
+    if "ix_citizen_reports_affected_road_id" not in existing_indexes:
+        op.create_index("ix_citizen_reports_affected_road_id", "citizen_reports", ["affected_road_id"])
+    if "report_media" in inspector.get_table_names():
+        if bind.dialect.name == "postgresql":
+            op.execute('ALTER TABLE "report_media" ENABLE ROW LEVEL SECURITY')
+            op.execute('REVOKE ALL PRIVILEGES ON TABLE "report_media" FROM anon')
+            op.execute('REVOKE ALL PRIVILEGES ON TABLE "report_media" FROM authenticated')
+            op.execute("INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types) VALUES ('hazard-reports', 'hazard-reports', false, 20000000, ARRAY['image/jpeg','image/png','image/webp','video/mp4']) ON CONFLICT (id) DO NOTHING")
+        return
     op.create_table(
         "report_media",
         sa.Column("media_id", sa.String(36), primary_key=True),
